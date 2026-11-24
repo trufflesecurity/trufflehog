@@ -23,8 +23,8 @@ func TestLemlist_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("LEMLIST")
-	inactiveSecret := testSecrets.MustGetField("LEMLIST_INACTIVE")
+	secret := testSecrets.MustGetField(t, "LEMLIST")
+	inactiveSecret := testSecrets.MustGetField(t, "LEMLIST_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

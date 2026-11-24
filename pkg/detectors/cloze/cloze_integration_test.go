@@ -23,9 +23,9 @@ func TestCloze_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	email := testSecrets.MustGetField("CLOZE_EMAIL")
-	secret := testSecrets.MustGetField("CLOZE")
-	inactiveSecret := testSecrets.MustGetField("CLOZE_INACTIVE")
+	email := testSecrets.MustGetField(t, "CLOZE_EMAIL")
+	secret := testSecrets.MustGetField(t, "CLOZE")
+	inactiveSecret := testSecrets.MustGetField(t, "CLOZE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

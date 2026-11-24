@@ -23,8 +23,8 @@ func TestSalesblink_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("SALESBLINK_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("SALESBLINK_INACTIVE")
+	secret := testSecrets.MustGetField(t, "SALESBLINK_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "SALESBLINK_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

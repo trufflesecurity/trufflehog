@@ -26,7 +26,7 @@ func TestRedHatPyxis_FromData(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	activeToken := testSecrets.MustGetField("REDHAT_PYXIS_API_KEY")
+	activeToken := testSecrets.MustGetField(t, "REDHAT_PYXIS_API_KEY")
 
 	// Random inactive token matching the expected format
 	inactiveToken := "o9ynnj1wfw33a50g9009ti0ne1kqe8ac"
@@ -181,7 +181,7 @@ func TestRedHatPyxis_FromData(t *testing.T) {
 				"SecretParts",
 			)
 
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf(
 					"RedHatPyxis.FromData() %s diff: (-got +want)\n%s",
 					tt.name,

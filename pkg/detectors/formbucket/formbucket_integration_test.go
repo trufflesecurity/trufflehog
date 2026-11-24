@@ -23,8 +23,8 @@ func TestFormBucket_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("FORMBUCKET")
-	inactiveSecret := testSecrets.MustGetField("FORMBUCKET_INACTIVE")
+	secret := testSecrets.MustGetField(t, "FORMBUCKET")
+	inactiveSecret := testSecrets.MustGetField(t, "FORMBUCKET_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

@@ -24,9 +24,9 @@ func TestAlibaba_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("ALIBABA_SECRET")
-	inactiveSecret := testSecrets.MustGetField("ALIBABA_SECRET_INACTIVE")
-	id := testSecrets.MustGetField("ALIBABA_ID")
+	secret := testSecrets.MustGetField(t, "ALIBABA_SECRET")
+	inactiveSecret := testSecrets.MustGetField(t, "ALIBABA_SECRET_INACTIVE")
+	id := testSecrets.MustGetField(t, "ALIBABA_ID")
 
 	type args struct {
 		ctx    context.Context
@@ -162,7 +162,7 @@ func TestAlibaba_FromChunk(t *testing.T) {
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("Alibaba.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

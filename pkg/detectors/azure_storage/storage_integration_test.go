@@ -27,8 +27,8 @@ func TestAzurestorage_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("AZURE_STORAGE")
-	inactiveSecret := testSecrets.MustGetField("AZURE_STORAGE_INACTIVE")
+	secret := testSecrets.MustGetField(t, "AZURE_STORAGE")
+	inactiveSecret := testSecrets.MustGetField(t, "AZURE_STORAGE_INACTIVE")
 
 	accountNamePat := regexp.MustCompile(`AccountName=(?P<account_name>[^;]+);AccountKey`)
 	accountName := accountNamePat.FindStringSubmatch(secret)[1]
@@ -181,7 +181,7 @@ func TestAzurestorage_FromChunk(t *testing.T) {
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("Azurestorage.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

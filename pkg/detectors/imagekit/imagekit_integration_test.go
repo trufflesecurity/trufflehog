@@ -23,8 +23,8 @@ func TestImagekit_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("IMAGEKIT_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("IMAGEKIT_INACTIVE")
+	secret := testSecrets.MustGetField(t, "IMAGEKIT_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "IMAGEKIT_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

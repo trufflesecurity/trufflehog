@@ -23,8 +23,8 @@ func TestFullstory_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("FULLSTORY_V2")
-	inactiveSecret := testSecrets.MustGetField("FULLSTORY_V2_INACTIVE")
+	secret := testSecrets.MustGetField(t, "FULLSTORY_V2")
+	inactiveSecret := testSecrets.MustGetField(t, "FULLSTORY_V2_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

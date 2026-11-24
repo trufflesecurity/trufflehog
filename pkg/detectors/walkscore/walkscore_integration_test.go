@@ -23,8 +23,8 @@ func TestWalkscore_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("WALKSCORE")
-	inactiveSecret := testSecrets.MustGetField("WALKSCORE_INACTIVE")
+	secret := testSecrets.MustGetField(t, "WALKSCORE")
+	inactiveSecret := testSecrets.MustGetField(t, "WALKSCORE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

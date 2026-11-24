@@ -24,8 +24,8 @@ func TestIpquality_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("IPQUALITY")
-	inactiveSecret := testSecrets.MustGetField("IPQUALITY_INACTIVE")
+	secret := testSecrets.MustGetField(t, "IPQUALITY")
+	inactiveSecret := testSecrets.MustGetField(t, "IPQUALITY_INACTIVE")
 
 	invalidResult := detectors.Result{DetectorType: detector_typepb.DetectorType_IPQuality, Verified: false}
 	invalidResult.SetVerificationError(errors.New("couldn't verify; API Key has " + insufficientCreditMessage))

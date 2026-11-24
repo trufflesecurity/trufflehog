@@ -23,8 +23,8 @@ func TestCarbonInterface_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("CARBONINTERFACE")
-	inactiveSecret := testSecrets.MustGetField("CARBONINTERFACE_INACTIVE")
+	secret := testSecrets.MustGetField(t, "CARBONINTERFACE")
+	inactiveSecret := testSecrets.MustGetField(t, "CARBONINTERFACE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

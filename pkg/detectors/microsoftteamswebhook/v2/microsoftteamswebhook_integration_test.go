@@ -23,8 +23,8 @@ func TestScanner_FromData(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("MICROSOFT_TEAMS_WEBHOOK_V2")
-	inactiveSecret := testSecrets.MustGetField("MICROSOFT_TEAMS_WEBHOOK_V2_INACTIVE")
+	secret := testSecrets.MustGetField(t, "MICROSOFT_TEAMS_WEBHOOK_V2")
+	inactiveSecret := testSecrets.MustGetField(t, "MICROSOFT_TEAMS_WEBHOOK_V2_INACTIVE")
 
 	tests := []struct {
 		name                string
@@ -96,8 +96,8 @@ func TestScanner_FromData(t *testing.T) {
 						got[i].VerificationError(), tt.wantVerificationErr)
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "ExtraData", "verificationError", "primarySecret", "SecretParts", "chunkOffset", "chunkOffsetSet")
-			if diff := cmp.Diff(tt.want, got, ignoreOpts); diff != "" {
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "ExtraData", "verificationError", "SecretParts")
+			if diff := cmp.Diff(tt.want, got, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("FromData() diff (-want +got):\n%s", diff)
 			}
 		})

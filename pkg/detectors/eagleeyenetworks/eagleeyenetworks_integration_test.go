@@ -23,9 +23,9 @@ func TestEagleEyeNetworks_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("EAGLEEYENETWORKS")
-	email := testSecrets.MustGetField("EAGLEEYENETWORKS_USER")
-	inactiveSecret := testSecrets.MustGetField("EAGLEEYENETWORKS_INACTIVE")
+	secret := testSecrets.MustGetField(t, "EAGLEEYENETWORKS")
+	email := testSecrets.MustGetField(t, "EAGLEEYENETWORKS_USER")
+	inactiveSecret := testSecrets.MustGetField(t, "EAGLEEYENETWORKS_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

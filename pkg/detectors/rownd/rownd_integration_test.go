@@ -23,10 +23,10 @@ func TestRownd_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	id := testSecrets.MustGetField("ROWND_APP_ID")
-	key := testSecrets.MustGetField("ROWND")
-	secret := testSecrets.MustGetField("ROWND_SECRET")
-	inactiveSecret := testSecrets.MustGetField("ROWND_SECRET_INACTIVE")
+	id := testSecrets.MustGetField(t, "ROWND_APP_ID")
+	key := testSecrets.MustGetField(t, "ROWND")
+	secret := testSecrets.MustGetField(t, "ROWND_SECRET")
+	inactiveSecret := testSecrets.MustGetField(t, "ROWND_SECRET_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

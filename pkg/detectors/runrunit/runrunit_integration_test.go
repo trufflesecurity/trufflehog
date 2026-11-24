@@ -23,10 +23,10 @@ func TestRunRunIt_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("RUNRUNIT")
-	inactiveSecret := testSecrets.MustGetField("RUNRUNIT_INACTIVE")
-	userToken := testSecrets.MustGetField("RUNRUNIT_USERTOKEN")
-	inactiveUserToken := testSecrets.MustGetField("RUNRUNIT_USERTOKEN_INACTIVE")
+	secret := testSecrets.MustGetField(t, "RUNRUNIT")
+	inactiveSecret := testSecrets.MustGetField(t, "RUNRUNIT_INACTIVE")
+	userToken := testSecrets.MustGetField(t, "RUNRUNIT_USERTOKEN")
+	inactiveUserToken := testSecrets.MustGetField(t, "RUNRUNIT_USERTOKEN_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

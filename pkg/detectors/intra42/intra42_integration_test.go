@@ -24,9 +24,9 @@ func TestIntra42_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("INTRA42_SECRET")
-	id := testSecrets.MustGetField("INTRA42_ID")
-	inactiveSecret := testSecrets.MustGetField("INTRA42_INACTIVE")
+	secret := testSecrets.MustGetField(t, "INTRA42_SECRET")
+	id := testSecrets.MustGetField(t, "INTRA42_ID")
+	inactiveSecret := testSecrets.MustGetField(t, "INTRA42_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -135,7 +135,7 @@ func TestIntra42_FromChunk(t *testing.T) {
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("Intra42.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

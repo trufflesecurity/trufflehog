@@ -23,8 +23,8 @@ func TestNimble_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("NIMBLE_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("NIMBLE_INACTIVE")
+	secret := testSecrets.MustGetField(t, "NIMBLE_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "NIMBLE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

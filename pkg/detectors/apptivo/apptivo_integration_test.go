@@ -23,9 +23,9 @@ func TestApptivo_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("APPTIVO")
-	id := testSecrets.MustGetField("APPTIVO_KEY")
-	inactiveSecret := testSecrets.MustGetField("APPTIVO_INACTIVE")
+	secret := testSecrets.MustGetField(t, "APPTIVO")
+	id := testSecrets.MustGetField(t, "APPTIVO_KEY")
+	inactiveSecret := testSecrets.MustGetField(t, "APPTIVO_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

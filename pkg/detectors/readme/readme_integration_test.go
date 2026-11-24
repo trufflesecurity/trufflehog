@@ -23,8 +23,8 @@ func TestReadMe_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("README")
-	inactiveSecret := testSecrets.MustGetField("README_INACTIVE")
+	secret := testSecrets.MustGetField(t, "README")
+	inactiveSecret := testSecrets.MustGetField(t, "README_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

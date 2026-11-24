@@ -23,8 +23,8 @@ func TestIPinfoDB_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("IPINFODB")
-	inactiveSecret := testSecrets.MustGetField("IPINFODB_INACTIVE")
+	secret := testSecrets.MustGetField(t, "IPINFODB")
+	inactiveSecret := testSecrets.MustGetField(t, "IPINFODB_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

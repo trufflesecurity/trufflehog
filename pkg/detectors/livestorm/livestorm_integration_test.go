@@ -23,8 +23,8 @@ func TestLivestorm_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("LIVESTORM")
-	inactiveSecret := testSecrets.MustGetField("LIVESTORM_INACTIVE")
+	secret := testSecrets.MustGetField(t, "LIVESTORM")
+	inactiveSecret := testSecrets.MustGetField(t, "LIVESTORM_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

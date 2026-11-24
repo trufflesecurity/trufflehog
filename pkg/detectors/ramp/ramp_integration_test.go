@@ -25,9 +25,9 @@ func TestRamp_FromChunk(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	id := testSecrets.MustGetField("RAMP")
-	secret := testSecrets.MustGetField("RAMP_SECRET")
-	inactiveId := testSecrets.MustGetField("RAMP_INACTIVE")
+	id := testSecrets.MustGetField(t, "RAMP")
+	secret := testSecrets.MustGetField(t, "RAMP_SECRET")
+	inactiveId := testSecrets.MustGetField(t, "RAMP_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -139,7 +139,7 @@ func TestRamp_FromChunk(t *testing.T) {
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("Ramp.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

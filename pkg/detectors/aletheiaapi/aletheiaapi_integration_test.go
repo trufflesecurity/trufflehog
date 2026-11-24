@@ -23,8 +23,8 @@ func TestAletheiaApi_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("ALETHEIAAPI")
-	inactiveSecret := testSecrets.MustGetField("ALETHEIAAPI_INACTIVE")
+	secret := testSecrets.MustGetField(t, "ALETHEIAAPI")
+	inactiveSecret := testSecrets.MustGetField(t, "ALETHEIAAPI_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

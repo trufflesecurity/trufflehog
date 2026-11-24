@@ -23,8 +23,8 @@ func TestWistia_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("WISTIA")
-	inactiveSecret := testSecrets.MustGetField("WISTIA_INACTIVE")
+	secret := testSecrets.MustGetField(t, "WISTIA")
+	inactiveSecret := testSecrets.MustGetField(t, "WISTIA_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

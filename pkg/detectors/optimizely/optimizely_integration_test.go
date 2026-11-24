@@ -23,8 +23,8 @@ func TestOptimizely_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("OPTIMIZELY")
-	inactiveSecret := testSecrets.MustGetField("OPTIMIZELY_INACTIVE")
+	secret := testSecrets.MustGetField(t, "OPTIMIZELY")
+	inactiveSecret := testSecrets.MustGetField(t, "OPTIMIZELY_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

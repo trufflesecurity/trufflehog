@@ -23,8 +23,8 @@ func TestNasdaqDataLink_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("NASDAQDATALINK")
-	inactiveSecret := testSecrets.MustGetField("NASDAQDATALINK_INACTIVE")
+	secret := testSecrets.MustGetField(t, "NASDAQDATALINK")
+	inactiveSecret := testSecrets.MustGetField(t, "NASDAQDATALINK_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

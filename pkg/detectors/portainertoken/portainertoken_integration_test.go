@@ -25,9 +25,9 @@ func TestPortainertoken_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("PORTAINERTOKEN")
-	inactiveSecret := testSecrets.MustGetField("PORTAINERTOKEN_INACTIVE")
-	endpoint := testSecrets.MustGetField("PORTAINER_ENDPOINT")
+	secret := testSecrets.MustGetField(t, "PORTAINERTOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "PORTAINERTOKEN_INACTIVE")
+	endpoint := testSecrets.MustGetField(t, "PORTAINER_ENDPOINT")
 
 	type args struct {
 		ctx    context.Context
@@ -107,7 +107,7 @@ func TestPortainertoken_FromChunk(t *testing.T) {
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("Portainertoken.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

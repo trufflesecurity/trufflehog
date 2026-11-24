@@ -24,8 +24,8 @@ func TestSentryToken_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("SENTRYTOKEN_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("SENTRYTOKEN_INACTIVE")
+	secret := testSecrets.MustGetField(t, "SENTRYTOKEN_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "SENTRYTOKEN_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -135,7 +135,7 @@ func TestSentryToken_FromChunk(t *testing.T) {
 				}
 			}
 			opts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
-			if diff := cmp.Diff(got, tt.want, opts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, opts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("Gitlab.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

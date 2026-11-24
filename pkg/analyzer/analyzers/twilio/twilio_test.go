@@ -27,8 +27,8 @@ func TestAnalyzer_Analyze(t *testing.T) {
 	}{
 		{
 			name: "valid Twilio key",
-			sid:  testSecrets.MustGetField("TWILLIO_ID"),
-			key:  testSecrets.MustGetField("TWILLIO_API"),
+			sid:  testSecrets.MustGetField(t, "TWILLIO_ID"),
+			key:  testSecrets.MustGetField(t, "TWILLIO_API"),
 			want: `            {
              "AnalyzerType": 20,
              "Bindings": [

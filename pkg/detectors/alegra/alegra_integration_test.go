@@ -23,9 +23,9 @@ func TestAlegra_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("ALEGRA")
-	id := testSecrets.MustGetField("ACCOUNT_USER")
-	inactiveSecret := testSecrets.MustGetField("ALEGRA_INACTIVE")
+	secret := testSecrets.MustGetField(t, "ALEGRA")
+	id := testSecrets.MustGetField(t, "ACCOUNT_USER")
+	inactiveSecret := testSecrets.MustGetField(t, "ALEGRA_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

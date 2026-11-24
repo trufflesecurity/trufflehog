@@ -23,8 +23,8 @@ func TestWit_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("WIT")
-	inactiveSecret := testSecrets.MustGetField("WIT_INACTIVE")
+	secret := testSecrets.MustGetField(t, "WIT")
+	inactiveSecret := testSecrets.MustGetField(t, "WIT_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -100,13 +100,10 @@ func TestWit_FromChunk(t *testing.T) {
 				detectors.Result{},
 				"ExtraData",
 				"verificationError",
-				"primarySecret",
 				"SecretParts",
-				"chunkOffset",
-				"chunkOffsetSet",
 			)
 
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("Wit.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

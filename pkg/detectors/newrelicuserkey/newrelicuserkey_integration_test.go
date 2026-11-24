@@ -24,8 +24,8 @@ func TestNewRelicUserKey_FromChunk(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	key := testSecrets.MustGetField("NEW_RELIC_USER_KEY")
-	keyEU := testSecrets.MustGetField("NEW_RELIC_USER_KEY_EU")
+	key := testSecrets.MustGetField(t, "NEW_RELIC_USER_KEY")
+	keyEU := testSecrets.MustGetField(t, "NEW_RELIC_USER_KEY_EU")
 	keyInactive := "NRAK-GDJSS4QZORUYIC1OGTRNGQMT5VH"
 
 	type args struct {

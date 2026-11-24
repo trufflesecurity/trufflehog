@@ -23,8 +23,8 @@ func TestTwitter_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("TWITTER")
-	inactiveSecret := testSecrets.MustGetField("TWITTER_INACTIVE")
+	secret := testSecrets.MustGetField(t, "TWITTER")
+	inactiveSecret := testSecrets.MustGetField(t, "TWITTER_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

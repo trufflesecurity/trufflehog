@@ -26,12 +26,12 @@ func TestTableau_FromChunk(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	tokenName := testSecrets.MustGetField("TABLEAU_TOKEN_NAME")
-	tokenSecret := testSecrets.MustGetField("TABLEAU_TOKEN_SECRET")
-	inactiveTokenName := testSecrets.MustGetField("TABLEAU_INACTIVE_TOKEN_NAME")
-	inactiveTokenSecret := testSecrets.MustGetField("TABLEAU_INACTIVE_TOKEN_SECRET")
-	tableauURL := testSecrets.MustGetField("TABLEAU_VALID_POD_NAME")
-	invalidURL := testSecrets.MustGetField("TABLEAU_INVALID_POD_NAME")
+	tokenName := testSecrets.MustGetField(t, "TABLEAU_TOKEN_NAME")
+	tokenSecret := testSecrets.MustGetField(t, "TABLEAU_TOKEN_SECRET")
+	inactiveTokenName := testSecrets.MustGetField(t, "TABLEAU_INACTIVE_TOKEN_NAME")
+	inactiveTokenSecret := testSecrets.MustGetField(t, "TABLEAU_INACTIVE_TOKEN_SECRET")
+	tableauURL := testSecrets.MustGetField(t, "TABLEAU_VALID_POD_NAME")
+	invalidURL := testSecrets.MustGetField(t, "TABLEAU_INVALID_POD_NAME")
 
 	type args struct {
 		ctx    context.Context
@@ -228,12 +228,12 @@ func TestTableau_FromChunk_MultipleMixedVerificationResults(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	tokenName := testSecrets.MustGetField("TABLEAU_TOKEN_NAME")
-	tokenSecret := testSecrets.MustGetField("TABLEAU_TOKEN_SECRET")
-	inactiveTokenName := testSecrets.MustGetField("TABLEAU_INACTIVE_TOKEN_NAME")
-	inactiveTokenSecret := testSecrets.MustGetField("TABLEAU_INACTIVE_TOKEN_SECRET")
-	tableauURL := testSecrets.MustGetField("TABLEAU_VALID_POD_NAME")
-	invalidURL := testSecrets.MustGetField("TABLEAU_INVALID_POD_NAME")
+	tokenName := testSecrets.MustGetField(t, "TABLEAU_TOKEN_NAME")
+	tokenSecret := testSecrets.MustGetField(t, "TABLEAU_TOKEN_SECRET")
+	inactiveTokenName := testSecrets.MustGetField(t, "TABLEAU_INACTIVE_TOKEN_NAME")
+	inactiveTokenSecret := testSecrets.MustGetField(t, "TABLEAU_INACTIVE_TOKEN_SECRET")
+	tableauURL := testSecrets.MustGetField(t, "TABLEAU_VALID_POD_NAME")
+	invalidURL := testSecrets.MustGetField(t, "TABLEAU_INVALID_POD_NAME")
 
 	scanner := Scanner{}
 	scanner.UseFoundEndpoints(true)

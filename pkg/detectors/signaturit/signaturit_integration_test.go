@@ -23,8 +23,8 @@ func TestSignaturit_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("SIGNATURIT")
-	inactiveSecret := testSecrets.MustGetField("SIGNATURIT_INACTIVE")
+	secret := testSecrets.MustGetField(t, "SIGNATURIT")
+	inactiveSecret := testSecrets.MustGetField(t, "SIGNATURIT_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

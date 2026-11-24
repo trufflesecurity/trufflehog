@@ -93,8 +93,8 @@ func TestSource_Validate(t *testing.T) {
 		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
 	}
 
-	s3key := secret.MustGetField("AWS_S3_KEY")
-	s3secret := secret.MustGetField("AWS_S3_SECRET")
+	s3key := secret.MustGetField(t, "AWS_S3_KEY")
+	s3secret := secret.MustGetField(t, "AWS_S3_SECRET")
 
 	tests := []struct {
 		name          string
@@ -405,8 +405,8 @@ func TestSource_Enumerate(t *testing.T) {
 		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
 	}
 
-	s3key := secret.MustGetField("AWS_S3_KEY")
-	s3secret := secret.MustGetField("AWS_S3_SECRET")
+	s3key := secret.MustGetField(t, "AWS_S3_KEY")
+	s3secret := secret.MustGetField(t, "AWS_S3_SECRET")
 
 	connection := &sourcespb.S3{
 		Credential: &sourcespb.S3_AccessKey{
@@ -451,8 +451,8 @@ func TestSource_ChunkUnit(t *testing.T) {
 		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
 	}
 
-	s3key := secret.MustGetField("AWS_S3_KEY")
-	s3secret := secret.MustGetField("AWS_S3_SECRET")
+	s3key := secret.MustGetField(t, "AWS_S3_KEY")
+	s3secret := secret.MustGetField(t, "AWS_S3_SECRET")
 
 	connection := &sourcespb.S3{
 		Credential: &sourcespb.S3_AccessKey{
@@ -595,8 +595,8 @@ func TestSourceChunksResumptionWithRole(t *testing.T) {
 		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
 	}
 
-	s3key := secret.MustGetField("AWS_S3_KEY")
-	s3secret := secret.MustGetField("AWS_S3_SECRET")
+	s3key := secret.MustGetField(t, "AWS_S3_KEY")
+	s3secret := secret.MustGetField(t, "AWS_S3_SECRET")
 
 	src := new(Source)
 	src.Progress = sources.Progress{

@@ -23,9 +23,9 @@ func TestTypetalk_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("TYPETALK")
-	id := testSecrets.MustGetField("TYPETALK_ID")
-	inactiveSecret := testSecrets.MustGetField("TYPETALK_INACTIVE")
+	secret := testSecrets.MustGetField(t, "TYPETALK")
+	id := testSecrets.MustGetField(t, "TYPETALK_ID")
+	inactiveSecret := testSecrets.MustGetField(t, "TYPETALK_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

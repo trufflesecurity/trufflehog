@@ -23,8 +23,8 @@ func TestFrameio_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("FRAMEIO_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("FRAMEIO_INACTIVE")
+	secret := testSecrets.MustGetField(t, "FRAMEIO_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "FRAMEIO_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

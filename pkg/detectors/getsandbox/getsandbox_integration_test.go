@@ -23,9 +23,9 @@ func TestGetSandbox_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("GETSANDBOX")
-	id := testSecrets.MustGetField("GETSANDBOX_ID")
-	inactiveSecret := testSecrets.MustGetField("GETSANDBOX_INACTIVE")
+	secret := testSecrets.MustGetField(t, "GETSANDBOX")
+	id := testSecrets.MustGetField(t, "GETSANDBOX_ID")
+	inactiveSecret := testSecrets.MustGetField(t, "GETSANDBOX_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

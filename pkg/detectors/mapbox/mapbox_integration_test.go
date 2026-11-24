@@ -23,9 +23,9 @@ func TestMapBox_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("MAPBOX_API_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("MAPBOX_API_INACTIVE")
-	id := testSecrets.MustGetField("MAPBOX_USER")
+	secret := testSecrets.MustGetField(t, "MAPBOX_API_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "MAPBOX_API_INACTIVE")
+	id := testSecrets.MustGetField(t, "MAPBOX_USER")
 
 	type args struct {
 		ctx    context.Context

@@ -23,8 +23,8 @@ func TestLokaliseToken_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("LOKALISE_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("LOKALISE_INACTIVE")
+	secret := testSecrets.MustGetField(t, "LOKALISE_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "LOKALISE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

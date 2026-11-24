@@ -23,8 +23,8 @@ func TestMeaningCloud_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("MEANINGCLOUD")
-	inactiveSecret := testSecrets.MustGetField("MEANINGCLOUD_INACTIVE")
+	secret := testSecrets.MustGetField(t, "MEANINGCLOUD")
+	inactiveSecret := testSecrets.MustGetField(t, "MEANINGCLOUD_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

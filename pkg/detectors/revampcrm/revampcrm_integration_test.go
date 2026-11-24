@@ -23,9 +23,9 @@ func TestRevampCRM_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("REVAMPCRM")
-	user := testSecrets.MustGetField("ACCOUNT_USER")
-	inactiveSecret := testSecrets.MustGetField("REVAMPCRM_INACTIVE")
+	secret := testSecrets.MustGetField(t, "REVAMPCRM")
+	user := testSecrets.MustGetField(t, "ACCOUNT_USER")
+	inactiveSecret := testSecrets.MustGetField(t, "REVAMPCRM_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

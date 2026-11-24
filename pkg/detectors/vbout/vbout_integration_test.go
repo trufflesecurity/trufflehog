@@ -23,8 +23,8 @@ func TestVbout_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("VBOUT")
-	inactiveSecret := testSecrets.MustGetField("VBOUT_INACTIVE")
+	secret := testSecrets.MustGetField(t, "VBOUT")
+	inactiveSecret := testSecrets.MustGetField(t, "VBOUT_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

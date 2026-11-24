@@ -23,10 +23,10 @@ func TestTrufflehogenterprise_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	host := testSecrets.MustGetField("THOG_HOSTNAME")
-	key := testSecrets.MustGetField("THOG_WEB_KEY")
-	secret := testSecrets.MustGetField("THOG_WEB_SECRET")
-	inactiveSecret := testSecrets.MustGetField("THOG_WEB_INACTIVE_SECRET")
+	host := testSecrets.MustGetField(t, "THOG_HOSTNAME")
+	key := testSecrets.MustGetField(t, "THOG_WEB_KEY")
+	secret := testSecrets.MustGetField(t, "THOG_WEB_SECRET")
+	inactiveSecret := testSecrets.MustGetField(t, "THOG_WEB_INACTIVE_SECRET")
 
 	type args struct {
 		ctx    context.Context

@@ -23,8 +23,8 @@ func TestDynalist_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("DYNALIST")
-	inactiveSecret := testSecrets.MustGetField("DYNALIST_INACTIVE")
+	secret := testSecrets.MustGetField(t, "DYNALIST")
+	inactiveSecret := testSecrets.MustGetField(t, "DYNALIST_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

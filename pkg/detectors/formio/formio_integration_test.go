@@ -23,8 +23,8 @@ func TestFormIO_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("FORMIO")
-	inactiveSecret := testSecrets.MustGetField("FORMIO_INACTIVE")
+	secret := testSecrets.MustGetField(t, "FORMIO")
+	inactiveSecret := testSecrets.MustGetField(t, "FORMIO_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

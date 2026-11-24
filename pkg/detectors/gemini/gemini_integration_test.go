@@ -24,11 +24,11 @@ func TestGemini_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secretMaster := testSecrets.MustGetField("GEMINI")
-	keyMaster := testSecrets.MustGetField("GEMINI_KEY")
-	secretAccount := testSecrets.MustGetField("GEMINI_ACCOUNT")
-	keyAccount := testSecrets.MustGetField("GEMINI_KEY_ACCOUNT")
-	inactiveSecret := testSecrets.MustGetField("GEMINI_INACTIVE")
+	secretMaster := testSecrets.MustGetField(t, "GEMINI")
+	keyMaster := testSecrets.MustGetField(t, "GEMINI_KEY")
+	secretAccount := testSecrets.MustGetField(t, "GEMINI_ACCOUNT")
+	keyAccount := testSecrets.MustGetField(t, "GEMINI_KEY_ACCOUNT")
+	inactiveSecret := testSecrets.MustGetField(t, "GEMINI_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -117,7 +117,7 @@ func TestGemini_FromChunk(t *testing.T) {
 				got[i].Raw = nil
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "RawV2")
-			if diff := cmp.Diff(tt.want, got, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(tt.want, got, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("Gemini.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

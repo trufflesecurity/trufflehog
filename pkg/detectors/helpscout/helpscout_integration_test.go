@@ -23,8 +23,8 @@ func TestHelpscout_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("HELPSCOUT_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("HELPSCOUT_INACTIVE")
+	secret := testSecrets.MustGetField(t, "HELPSCOUT_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "HELPSCOUT_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

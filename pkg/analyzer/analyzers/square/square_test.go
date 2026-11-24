@@ -32,7 +32,7 @@ func TestAnalyzer_Analyze(t *testing.T) {
 	}{
 		{
 			name:    "valid Square key",
-			key:     testSecrets.MustGetField("SQUARE_SECRET"),
+			key:     testSecrets.MustGetField(t, "SQUARE_SECRET"),
 			want:    expectedOutput,
 			wantErr: false,
 		},

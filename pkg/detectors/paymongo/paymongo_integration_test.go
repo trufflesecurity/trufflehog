@@ -23,8 +23,8 @@ func TestPaymongo_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("PAYMONGO")
-	inactiveSecret := testSecrets.MustGetField("PAYMONGO_INACTIVE")
+	secret := testSecrets.MustGetField(t, "PAYMONGO")
+	inactiveSecret := testSecrets.MustGetField(t, "PAYMONGO_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

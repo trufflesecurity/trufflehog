@@ -24,10 +24,10 @@ func TestNewRelicInsightsQueryKey_FromChunk(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	key := testSecrets.MustGetField("NEW_RELIC_INSIGHTS_QUERY_KEY")
-	accountID := testSecrets.MustGetField("NEW_RELIC_INSIGHTS_ACCOUNT_ID")
-	keyEU := testSecrets.MustGetField("NEW_RELIC_INSIGHTS_QUERY_KEY_EU")
-	accountIDEU := testSecrets.MustGetField("NEW_RELIC_INSIGHTS_ACCOUNT_ID_EU")
+	key := testSecrets.MustGetField(t, "NEW_RELIC_INSIGHTS_QUERY_KEY")
+	accountID := testSecrets.MustGetField(t, "NEW_RELIC_INSIGHTS_ACCOUNT_ID")
+	keyEU := testSecrets.MustGetField(t, "NEW_RELIC_INSIGHTS_QUERY_KEY_EU")
+	accountIDEU := testSecrets.MustGetField(t, "NEW_RELIC_INSIGHTS_ACCOUNT_ID_EU")
 	keyInactive := "NRIQ-Xc_V8HruIZ271_l9FQm-_nJ8_"
 
 	type args struct {

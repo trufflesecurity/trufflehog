@@ -23,8 +23,8 @@ func TestDetectLanguage_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("DETECTLANGUAGE")
-	inactiveSecret := testSecrets.MustGetField("DETECTLANGUAGE_INACTIVE")
+	secret := testSecrets.MustGetField(t, "DETECTLANGUAGE")
+	inactiveSecret := testSecrets.MustGetField(t, "DETECTLANGUAGE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

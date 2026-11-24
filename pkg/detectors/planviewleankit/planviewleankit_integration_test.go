@@ -23,9 +23,9 @@ func TestPlanviewLeanKit_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("PLANVIEWLEANKIT")
-	inactiveSecret := testSecrets.MustGetField("PLANVIEWLEANKIT_INACTIVE")
-	subdomain := testSecrets.MustGetField("PLANVIEWLEANKIT_SUBDOMAIN")
+	secret := testSecrets.MustGetField(t, "PLANVIEWLEANKIT")
+	inactiveSecret := testSecrets.MustGetField(t, "PLANVIEWLEANKIT_INACTIVE")
+	subdomain := testSecrets.MustGetField(t, "PLANVIEWLEANKIT_SUBDOMAIN")
 
 	// log.Println(secret)
 	// log.Println(inactiveSecret)

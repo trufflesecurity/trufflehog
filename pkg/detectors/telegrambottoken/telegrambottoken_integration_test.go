@@ -23,8 +23,8 @@ func TestTelegramBotToken_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("TELEGRAMBOTTOKEN_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("TELEGRAMBOTTOKEN_INACTIVE")
+	secret := testSecrets.MustGetField(t, "TELEGRAMBOTTOKEN_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "TELEGRAMBOTTOKEN_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

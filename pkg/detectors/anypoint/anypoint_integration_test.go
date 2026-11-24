@@ -23,9 +23,9 @@ func TestAnypoint_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("ANYPOINT_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("ANYPOINT_INACTIVE")
-	organizationId := testSecrets.MustGetField("ANYPOINT_ORGANIZATIONID")
+	secret := testSecrets.MustGetField(t, "ANYPOINT_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "ANYPOINT_INACTIVE")
+	organizationId := testSecrets.MustGetField(t, "ANYPOINT_ORGANIZATIONID")
 
 	type args struct {
 		ctx    context.Context

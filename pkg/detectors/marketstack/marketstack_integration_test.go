@@ -23,8 +23,8 @@ func TestMarketstack_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("MARKETSTACK")
-	inactiveSecret := testSecrets.MustGetField("MARKETSTACK_INACTIVE")
+	secret := testSecrets.MustGetField(t, "MARKETSTACK")
+	inactiveSecret := testSecrets.MustGetField(t, "MARKETSTACK_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

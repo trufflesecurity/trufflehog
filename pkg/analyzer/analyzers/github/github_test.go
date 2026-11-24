@@ -232,7 +232,7 @@ func TestAnalyzer_Analyze(t *testing.T) {
 	}{
 		{
 			name:    "finegrained - github-allrepos-actionsRW-contentsRW-issuesRW",
-			key:     analyzerSecrets.MustGetField("GITHUB_FINEGRAINED_ALLREPOS_ACTIONS_RW_CONTENTS_RW_ISSUES_RW"),
+			key:     analyzerSecrets.MustGetField(t, "GITHUB_FINEGRAINED_ALLREPOS_ACTIONS_RW_CONTENTS_RW_ISSUES_RW"),
 			wantErr: false,
 			want: `{
               "AnalyzerType": 7,
@@ -439,7 +439,7 @@ func TestAnalyzer_Analyze(t *testing.T) {
 		},
 		{
 			name: "v2 ghp",
-			key:  testSecrets.MustGetField("GITHUB_VERIFIED_GHP"),
+			key:  testSecrets.MustGetField(t, "GITHUB_VERIFIED_GHP"),
 			want: `{
               "AnalyzerType": 7,
               "Bindings": [

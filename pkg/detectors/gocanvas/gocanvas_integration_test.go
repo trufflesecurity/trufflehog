@@ -23,9 +23,9 @@ func TestGoCanvas_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	username := testSecrets.MustGetField("SCANNERS_EMAIL")
-	secret := testSecrets.MustGetField("GOCANVAS")
-	inactiveSecret := testSecrets.MustGetField("GOCANVAS_INACTIVE")
+	username := testSecrets.MustGetField(t, "SCANNERS_EMAIL")
+	secret := testSecrets.MustGetField(t, "GOCANVAS")
+	inactiveSecret := testSecrets.MustGetField(t, "GOCANVAS_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

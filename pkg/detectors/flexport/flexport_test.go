@@ -83,9 +83,9 @@ func TestFlexport_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("FLEXPORT")
-	inactiveSecret := testSecrets.MustGetField("FLEXPORT_INACTIVE")
-	secretNoPermissions := testSecrets.MustGetField("FLEXPORT_NO_PERMISSIONS")
+	secret := testSecrets.MustGetField(t, "FLEXPORT")
+	inactiveSecret := testSecrets.MustGetField(t, "FLEXPORT_INACTIVE")
+	secretNoPermissions := testSecrets.MustGetField(t, "FLEXPORT_NO_PERMISSIONS")
 
 	type args struct {
 		ctx    context.Context
@@ -214,7 +214,7 @@ func TestFlexport_FromChunk(t *testing.T) {
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("Flexport.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

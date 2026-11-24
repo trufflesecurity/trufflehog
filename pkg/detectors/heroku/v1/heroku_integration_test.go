@@ -23,8 +23,8 @@ func TestHeroku_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("HEROKU")
-	inactiveSecret := testSecrets.MustGetField("HEROKU_INACTIVE")
+	secret := testSecrets.MustGetField(t, "HEROKU")
+	inactiveSecret := testSecrets.MustGetField(t, "HEROKU_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

@@ -23,8 +23,8 @@ func TestMessageBird_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("MESSAGEBIRD_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("MESSAGEBIRD_INACTIVE")
+	secret := testSecrets.MustGetField(t, "MESSAGEBIRD_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "MESSAGEBIRD_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

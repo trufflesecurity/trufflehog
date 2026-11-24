@@ -23,8 +23,8 @@ func TestFinage_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("FINAGE")
-	inactiveSecret := testSecrets.MustGetField("FINAGE_INACTIVE")
+	secret := testSecrets.MustGetField(t, "FINAGE")
+	inactiveSecret := testSecrets.MustGetField(t, "FINAGE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

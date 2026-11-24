@@ -25,9 +25,9 @@ func TestDatabricksToken_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("DATABRICKSTOKEN")
-	inactiveSecret := testSecrets.MustGetField("DATABRICKSTOKEN_INACTIVE")
-	domain := testSecrets.MustGetField("DATABRICKSTOKEN_DOMAIN")
+	secret := testSecrets.MustGetField(t, "DATABRICKSTOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "DATABRICKSTOKEN_INACTIVE")
+	domain := testSecrets.MustGetField(t, "DATABRICKSTOKEN_DOMAIN")
 
 	type args struct {
 		ctx    context.Context
@@ -139,7 +139,7 @@ func TestDatabricksToken_FromChunk(t *testing.T) {
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "SecretParts")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("DatabricksToken.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

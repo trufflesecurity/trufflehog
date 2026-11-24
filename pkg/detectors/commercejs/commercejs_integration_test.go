@@ -23,8 +23,8 @@ func TestCommerceJS_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("COMMERCEJS")
-	inactiveSecret := testSecrets.MustGetField("COMMERCEJS_INACTIVE")
+	secret := testSecrets.MustGetField(t, "COMMERCEJS")
+	inactiveSecret := testSecrets.MustGetField(t, "COMMERCEJS_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

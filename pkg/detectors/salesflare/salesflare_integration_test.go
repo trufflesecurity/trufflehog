@@ -23,8 +23,8 @@ func TestSalesflare_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("SALESFLARE_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("SALESFLARE_INACTIVE")
+	secret := testSecrets.MustGetField(t, "SALESFLARE_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "SALESFLARE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

@@ -23,8 +23,8 @@ func TestPeopleDataLabs_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("PEOPLEDATALABS")
-	inactiveSecret := testSecrets.MustGetField("PEOPLEDATALABS_INACTIVE")
+	secret := testSecrets.MustGetField(t, "PEOPLEDATALABS")
+	inactiveSecret := testSecrets.MustGetField(t, "PEOPLEDATALABS_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

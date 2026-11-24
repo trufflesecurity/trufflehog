@@ -32,7 +32,7 @@ func TestAnalyzer_Analyze(t *testing.T) {
 	}{
 		{
 			name:    "valid Mailchimp key",
-			key:     testSecrets.MustGetField("MAILCHIMP"),
+			key:     testSecrets.MustGetField(t, "MAILCHIMP"),
 			want:    string(expected_output),
 			wantErr: false,
 		},

@@ -23,8 +23,8 @@ func TestClose_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("CLOSE_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("CLOSE_INACTIVE")
+	secret := testSecrets.MustGetField(t, "CLOSE_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "CLOSE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

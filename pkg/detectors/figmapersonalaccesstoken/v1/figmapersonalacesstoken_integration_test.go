@@ -24,8 +24,8 @@ func TestFigmaPersonalAccessToken_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("FIGMAPERSONALACCESSTOKEN_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("FIGMAPERSONALACCESSTOKEN_INACTIVE")
+	secret := testSecrets.MustGetField(t, "FIGMAPERSONALACCESSTOKEN_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "FIGMAPERSONALACCESSTOKEN_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -145,8 +145,8 @@ func TestFigmaPersonalAccessToken_FromChunk(t *testing.T) {
 					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "primarySecret", "SecretParts", "chunkOffset", "chunkOffsetSet")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "SecretParts")
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("FigmaPersonalAccessToken.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

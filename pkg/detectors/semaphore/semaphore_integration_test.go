@@ -23,8 +23,8 @@ func TestSemaphore_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("SEMAPHORE")
-	inactiveSecret := testSecrets.MustGetField("SEMAPHORE_INACTIVE")
+	secret := testSecrets.MustGetField(t, "SEMAPHORE")
+	inactiveSecret := testSecrets.MustGetField(t, "SEMAPHORE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

@@ -23,8 +23,8 @@ func TestEthplorer_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("ETHPLORER")
-	inactiveSecret := testSecrets.MustGetField("ETHPLORER_INACTIVE")
+	secret := testSecrets.MustGetField(t, "ETHPLORER")
+	inactiveSecret := testSecrets.MustGetField(t, "ETHPLORER_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

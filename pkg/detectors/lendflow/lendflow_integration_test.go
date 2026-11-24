@@ -23,8 +23,8 @@ func TestLendflow_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("LENDFLOW")
-	inactiveSecret := testSecrets.MustGetField("LENDFLOW_INACTIVE")
+	secret := testSecrets.MustGetField(t, "LENDFLOW")
+	inactiveSecret := testSecrets.MustGetField(t, "LENDFLOW_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

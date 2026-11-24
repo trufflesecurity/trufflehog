@@ -23,8 +23,8 @@ func TestCloudmersive_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("CLOUDMERSIVE")
-	inactiveSecret := testSecrets.MustGetField("CLOUDMERSIVE_INACTIVE")
+	secret := testSecrets.MustGetField(t, "CLOUDMERSIVE")
+	inactiveSecret := testSecrets.MustGetField(t, "CLOUDMERSIVE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

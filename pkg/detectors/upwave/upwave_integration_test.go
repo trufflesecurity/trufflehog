@@ -23,8 +23,8 @@ func TestUpwave_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("UPWAVE")
-	inactiveSecret := testSecrets.MustGetField("UPWAVE_INACTIVE")
+	secret := testSecrets.MustGetField(t, "UPWAVE")
+	inactiveSecret := testSecrets.MustGetField(t, "UPWAVE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

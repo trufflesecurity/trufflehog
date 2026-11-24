@@ -23,9 +23,9 @@ func TestNeutrinoApi_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("NEUTRINOAPI")
-	id := testSecrets.MustGetField("NEUTRINOAPI_ID")
-	inactiveSecret := testSecrets.MustGetField("NEUTRINOAPI_INACTIVE")
+	secret := testSecrets.MustGetField(t, "NEUTRINOAPI")
+	id := testSecrets.MustGetField(t, "NEUTRINOAPI_ID")
+	inactiveSecret := testSecrets.MustGetField(t, "NEUTRINOAPI_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

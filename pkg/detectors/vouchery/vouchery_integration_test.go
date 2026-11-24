@@ -23,9 +23,9 @@ func TestVouchery_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("VOUCHERY")
-	subdomain := testSecrets.MustGetField("VOUCHERY_SUBDOMAIN")
-	inactiveSecret := testSecrets.MustGetField("VOUCHERY_INACTIVE")
+	secret := testSecrets.MustGetField(t, "VOUCHERY")
+	subdomain := testSecrets.MustGetField(t, "VOUCHERY_SUBDOMAIN")
+	inactiveSecret := testSecrets.MustGetField(t, "VOUCHERY_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

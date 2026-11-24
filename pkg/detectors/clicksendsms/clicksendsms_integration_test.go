@@ -23,9 +23,9 @@ func TestClickSendsms_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("CLICKSENDSMS_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("CLICKSENDSMS_INACTIVE")
-	email := testSecrets.MustGetField("CLICKSENDSMS_EMAIL")
+	secret := testSecrets.MustGetField(t, "CLICKSENDSMS_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "CLICKSENDSMS_INACTIVE")
+	email := testSecrets.MustGetField(t, "CLICKSENDSMS_EMAIL")
 
 	type args struct {
 		ctx    context.Context

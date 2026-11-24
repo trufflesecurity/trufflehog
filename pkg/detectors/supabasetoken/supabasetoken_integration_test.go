@@ -23,8 +23,8 @@ func TestSupabasetoken_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("SUPABASETOKEN")
-	inactiveSecret := testSecrets.MustGetField("SUPABASETOKEN_INACTIVE")
+	secret := testSecrets.MustGetField(t, "SUPABASETOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "SUPABASETOKEN_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

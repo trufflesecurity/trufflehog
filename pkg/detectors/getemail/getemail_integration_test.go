@@ -23,8 +23,8 @@ func TestGetEmail_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("GETEMAIL")
-	inactiveSecret := testSecrets.MustGetField("GETEMAIL_INACTIVE")
+	secret := testSecrets.MustGetField(t, "GETEMAIL")
+	inactiveSecret := testSecrets.MustGetField(t, "GETEMAIL_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

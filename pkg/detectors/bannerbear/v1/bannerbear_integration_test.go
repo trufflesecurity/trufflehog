@@ -24,8 +24,8 @@ func TestBannerbear_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("BANNERBEAR")
-	inactiveSecret := testSecrets.MustGetField("BANNERBEAR_INACTIVE")
+	secret := testSecrets.MustGetField(t, "BANNERBEAR")
+	inactiveSecret := testSecrets.MustGetField(t, "BANNERBEAR_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -99,7 +99,7 @@ func TestBannerbear_FromChunk(t *testing.T) {
 			}
 
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "verificationError", "primarySecret", "ExtraData")
-			if diff := cmp.Diff(tt.want, got, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(tt.want, got, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("BannerbearV1.FromData() %s - diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

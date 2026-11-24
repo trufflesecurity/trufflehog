@@ -24,11 +24,11 @@ func TestHashiCorpVaultAuth_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	roleId := testSecrets.MustGetField("HASHICORPVAULTAUTH_ROLE_ID")
-	secretId := testSecrets.MustGetField("HASHICORPVAULTAUTH_SECRET_ID")
-	inactiveRoleId := testSecrets.MustGetField("HASHICORPVAULTAUTH_ROLE_ID_INACTIVE")
-	inactiveSecretId := testSecrets.MustGetField("HASHICORPVAULTAUTH_SECRET_ID_INACTIVE")
-	vaultUrl := testSecrets.MustGetField("HASHICORPVAULTAUTH_URL")
+	roleId := testSecrets.MustGetField(t, "HASHICORPVAULTAUTH_ROLE_ID")
+	secretId := testSecrets.MustGetField(t, "HASHICORPVAULTAUTH_SECRET_ID")
+	inactiveRoleId := testSecrets.MustGetField(t, "HASHICORPVAULTAUTH_ROLE_ID_INACTIVE")
+	inactiveSecretId := testSecrets.MustGetField(t, "HASHICORPVAULTAUTH_SECRET_ID_INACTIVE")
+	vaultUrl := testSecrets.MustGetField(t, "HASHICORPVAULTAUTH_URL")
 
 	type args struct {
 		ctx    context.Context
@@ -173,9 +173,9 @@ func TestHashiCorpVaultAuth_WithCustomEndpoint(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	roleId := testSecrets.MustGetField("HASHICORPVAULTAUTH_ROLE_ID")
-	secretId := testSecrets.MustGetField("HASHICORPVAULTAUTH_SECRET_ID")
-	vaultUrl := testSecrets.MustGetField("HASHICORPVAULTAUTH_URL")
+	roleId := testSecrets.MustGetField(t, "HASHICORPVAULTAUTH_ROLE_ID")
+	secretId := testSecrets.MustGetField(t, "HASHICORPVAULTAUTH_SECRET_ID")
+	vaultUrl := testSecrets.MustGetField(t, "HASHICORPVAULTAUTH_URL")
 	s := Scanner{}
 	s.UseCloudEndpoint(true)
 	s.UseFoundEndpoints(true)
@@ -191,7 +191,7 @@ func TestHashiCorpVaultAuth_WithCustomEndpoint(t *testing.T) {
 	}
 	want := []detectors.Result{
 		{
-			DetectorType:          detectorspb.DetectorType_HashiCorpVaultAuth,
+			DetectorType:          detector_typepb.DetectorType_HashiCorpVaultAuth,
 			Verified:              true,
 			VerificationFromCache: false,
 			Raw:                   []byte(secretId),

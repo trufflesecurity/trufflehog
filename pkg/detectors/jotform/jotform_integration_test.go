@@ -23,8 +23,8 @@ func TestJotform_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("JOTFORM")
-	inactiveSecret := testSecrets.MustGetField("JOTFORM_INACTIVE")
+	secret := testSecrets.MustGetField(t, "JOTFORM")
+	inactiveSecret := testSecrets.MustGetField(t, "JOTFORM_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

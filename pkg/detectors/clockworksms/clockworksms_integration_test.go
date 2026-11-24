@@ -23,9 +23,9 @@ func TestClockworksms_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	userKey := testSecrets.MustGetField("CLOCKWORKSMS_USERKEY")
-	token := testSecrets.MustGetField("CLOCKWORKSMS_TOKEN")
-	inactiveToken := testSecrets.MustGetField("CLOCKWORKSMS_INACTIVE")
+	userKey := testSecrets.MustGetField(t, "CLOCKWORKSMS_USERKEY")
+	token := testSecrets.MustGetField(t, "CLOCKWORKSMS_TOKEN")
+	inactiveToken := testSecrets.MustGetField(t, "CLOCKWORKSMS_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

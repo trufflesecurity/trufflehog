@@ -23,8 +23,8 @@ func TestFlatIO_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("FLATIO")
-	inactiveSecret := testSecrets.MustGetField("FLATIO_INACTIVE")
+	secret := testSecrets.MustGetField(t, "FLATIO")
+	inactiveSecret := testSecrets.MustGetField(t, "FLATIO_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

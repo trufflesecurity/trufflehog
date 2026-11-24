@@ -25,9 +25,9 @@ func TestAzureSearchQueryKey_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("AZURE_SEARCH_QUERY_KEY")
-	inactiveSecret := testSecrets.MustGetField("AZURE_SEARCH_QUERY_KEY_INACTIVE")
-	url := testSecrets.MustGetField("AZURE_SEARCH_QUERY_KEY_URL")
+	secret := testSecrets.MustGetField(t, "AZURE_SEARCH_QUERY_KEY")
+	inactiveSecret := testSecrets.MustGetField(t, "AZURE_SEARCH_QUERY_KEY_INACTIVE")
+	url := testSecrets.MustGetField(t, "AZURE_SEARCH_QUERY_KEY_URL")
 
 	type args struct {
 		ctx    context.Context
@@ -146,7 +146,7 @@ func TestAzureSearchQueryKey_FromChunk(t *testing.T) {
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("AzureSearchQueryKey.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

@@ -24,9 +24,9 @@ func TestGoogleGemini_FromChunk(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	keyGemini := testSecrets.MustGetField("GOOGLE_GEMINI_API_KEY")
-	keyNonGemini := testSecrets.MustGetField("GOOGLE_CLOUD_API_KEY")
-	keyInactive := testSecrets.MustGetField("GOOGLE_GEMINI_API_KEY_INACTIVE")
+	keyGemini := testSecrets.MustGetField(t, "GOOGLE_GEMINI_API_KEY")
+	keyNonGemini := testSecrets.MustGetField(t, "GOOGLE_CLOUD_API_KEY")
+	keyInactive := testSecrets.MustGetField(t, "GOOGLE_GEMINI_API_KEY_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

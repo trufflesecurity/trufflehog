@@ -23,8 +23,8 @@ func TestTransferwise_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("TRANSFERWISE")
-	inactiveSecret := testSecrets.MustGetField("TRANSFERWISE_INACTIVE")
+	secret := testSecrets.MustGetField(t, "TRANSFERWISE")
+	inactiveSecret := testSecrets.MustGetField(t, "TRANSFERWISE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

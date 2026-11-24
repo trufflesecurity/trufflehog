@@ -23,8 +23,8 @@ func TestWorldweather_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("WORLDWEATHER")
-	inactiveSecret := testSecrets.MustGetField("WORLDWEATHER_INACTIVE")
+	secret := testSecrets.MustGetField(t, "WORLDWEATHER")
+	inactiveSecret := testSecrets.MustGetField(t, "WORLDWEATHER_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

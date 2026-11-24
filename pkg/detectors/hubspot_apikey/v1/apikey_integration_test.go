@@ -23,8 +23,8 @@ func TestHubSpotApiKey_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("HUBSPOTAPIKEY_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("HUBSPOTAPIKEY_INACTIVE")
+	secret := testSecrets.MustGetField(t, "HUBSPOTAPIKEY_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "HUBSPOTAPIKEY_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

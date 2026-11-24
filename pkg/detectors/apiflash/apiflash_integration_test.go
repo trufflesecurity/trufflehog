@@ -23,9 +23,9 @@ func TestApiflash_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("APIFLASH")
-	url := testSecrets.MustGetField("API_URL")
-	inactiveSecret := testSecrets.MustGetField("APIFLASH_INACTIVE")
+	secret := testSecrets.MustGetField(t, "APIFLASH")
+	url := testSecrets.MustGetField(t, "API_URL")
+	inactiveSecret := testSecrets.MustGetField(t, "APIFLASH_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

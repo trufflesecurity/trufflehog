@@ -23,8 +23,8 @@ func TestBitbar_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("BITBAR")
-	inactiveSecret := testSecrets.MustGetField("BITBAR_INACTIVE")
+	secret := testSecrets.MustGetField(t, "BITBAR")
+	inactiveSecret := testSecrets.MustGetField(t, "BITBAR_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

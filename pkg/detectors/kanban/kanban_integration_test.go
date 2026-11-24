@@ -23,9 +23,9 @@ func TestKanban_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("KANBAN")
-	url := testSecrets.MustGetField("KANBAN_URL")
-	inactiveSecret := testSecrets.MustGetField("KANBAN_INACTIVE")
+	secret := testSecrets.MustGetField(t, "KANBAN")
+	url := testSecrets.MustGetField(t, "KANBAN_URL")
+	inactiveSecret := testSecrets.MustGetField(t, "KANBAN_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

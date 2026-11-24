@@ -23,9 +23,9 @@ func TestSumoLogicKey_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	id := testSecrets.MustGetField("SUMOLOGIC_ACCESSID")
-	secret := testSecrets.MustGetField("SUMOLOGIC_ACCESSKEY")
-	inactiveId := testSecrets.MustGetField("SUMOLOGIC_ACCESSKEY_INACTIVE")
+	id := testSecrets.MustGetField(t, "SUMOLOGIC_ACCESSID")
+	secret := testSecrets.MustGetField(t, "SUMOLOGIC_ACCESSKEY")
+	inactiveId := testSecrets.MustGetField(t, "SUMOLOGIC_ACCESSKEY_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

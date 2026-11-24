@@ -23,9 +23,9 @@ func TestBulksms_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("BULKSMS")
-	inactiveSecret := testSecrets.MustGetField("BULKSMS_INACTIVE")
-	token := testSecrets.MustGetField("BULKSMS_TOKEN")
+	secret := testSecrets.MustGetField(t, "BULKSMS")
+	inactiveSecret := testSecrets.MustGetField(t, "BULKSMS_INACTIVE")
+	token := testSecrets.MustGetField(t, "BULKSMS_TOKEN")
 
 	type args struct {
 		ctx    context.Context

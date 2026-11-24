@@ -23,8 +23,8 @@ func TestDataGov_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("DATAGOV")
-	inactiveSecret := testSecrets.MustGetField("DATAGOV_INACTIVE")
+	secret := testSecrets.MustGetField(t, "DATAGOV")
+	inactiveSecret := testSecrets.MustGetField(t, "DATAGOV_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

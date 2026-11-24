@@ -23,8 +23,8 @@ func TestStatuspal_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("STATUSPAL")
-	inactiveSecret := testSecrets.MustGetField("STATUSPAL_INACTIVE")
+	secret := testSecrets.MustGetField(t, "STATUSPAL")
+	inactiveSecret := testSecrets.MustGetField(t, "STATUSPAL_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

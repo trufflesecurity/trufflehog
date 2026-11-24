@@ -24,9 +24,9 @@ func TestGCP_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("GCP_SECRET")
-	secretInactive := testSecrets.MustGetField("GCP_INACTIVE")
-	secretDisabled := testSecrets.MustGetField("GCP_DISABLED")
+	secret := testSecrets.MustGetField(t, "GCP_SECRET")
+	secretInactive := testSecrets.MustGetField(t, "GCP_INACTIVE")
+	secretDisabled := testSecrets.MustGetField(t, "GCP_DISABLED")
 
 	type args struct {
 		ctx    context.Context
@@ -152,7 +152,7 @@ func TestGCP_KeyIDPopulation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("GCP_SECRET")
+	secret := testSecrets.MustGetField(t, "GCP_SECRET")
 
 	s := Scanner{}
 	results, err := s.FromData(ctx, true, []byte(secret))

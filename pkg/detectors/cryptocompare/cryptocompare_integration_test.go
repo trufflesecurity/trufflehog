@@ -23,8 +23,8 @@ func TestCryptoCompare_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("CRYPTOCOMPARE")
-	inactiveSecret := testSecrets.MustGetField("CRYPTOCOMPARE_INACTIVE")
+	secret := testSecrets.MustGetField(t, "CRYPTOCOMPARE")
+	inactiveSecret := testSecrets.MustGetField(t, "CRYPTOCOMPARE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

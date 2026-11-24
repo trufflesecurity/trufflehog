@@ -23,9 +23,9 @@ func TestCopper_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("COOPER_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("COOPER_INACTIVE")
-	id := testSecrets.MustGetField("COOPER_ID")
+	secret := testSecrets.MustGetField(t, "COOPER_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "COOPER_INACTIVE")
+	id := testSecrets.MustGetField(t, "COOPER_ID")
 
 	type args struct {
 		ctx    context.Context
@@ -99,7 +99,7 @@ func TestCopper_FromChunk(t *testing.T) {
 				got[i].RawV2 = nil
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "primarySecret")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("Abstract.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

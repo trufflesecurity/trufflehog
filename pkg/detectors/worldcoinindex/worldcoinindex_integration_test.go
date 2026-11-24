@@ -23,8 +23,8 @@ func TestWorldCoinIndex_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("WORLDCOININDEX")
-	inactiveSecret := testSecrets.MustGetField("WORLDCOININDEX_INACTIVE")
+	secret := testSecrets.MustGetField(t, "WORLDCOININDEX")
+	inactiveSecret := testSecrets.MustGetField(t, "WORLDCOININDEX_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

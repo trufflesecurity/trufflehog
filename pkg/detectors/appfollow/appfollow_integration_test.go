@@ -23,8 +23,8 @@ func TestAppfollow_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("APPFOLLOW")
-	inactiveSecret := testSecrets.MustGetField("APPFOLLOW_INACTIVE")
+	secret := testSecrets.MustGetField(t, "APPFOLLOW")
+	inactiveSecret := testSecrets.MustGetField(t, "APPFOLLOW_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

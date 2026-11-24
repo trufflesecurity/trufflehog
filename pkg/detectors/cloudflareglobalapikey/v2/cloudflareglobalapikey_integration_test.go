@@ -24,9 +24,9 @@ func TestCloudflareGlobalApiKeyV2_FromChunk(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	globalApiKey := testSecrets.MustGetField("CLOUDFLARE_GLOBAL_API_KEY_V2")
-	globalApiKeyEmail := testSecrets.MustGetField("CLOUDFLARE_GLOBAL_API_KEY_V2_EMAIL")
-	inactiveGlobalApiKey := testSecrets.MustGetField("CLOUDFLARE_GLOBAL_API_KEY_V2_INACTIVE")
+	globalApiKey := testSecrets.MustGetField(t, "CLOUDFLARE_GLOBAL_API_KEY_V2")
+	globalApiKeyEmail := testSecrets.MustGetField(t, "CLOUDFLARE_GLOBAL_API_KEY_V2_EMAIL")
+	inactiveGlobalApiKey := testSecrets.MustGetField(t, "CLOUDFLARE_GLOBAL_API_KEY_V2_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

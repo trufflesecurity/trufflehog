@@ -31,7 +31,7 @@ func TestAnalyzer_Analyze(t *testing.T) {
 	}{
 		{
 			name:    "valid Slack key",
-			key:     testSecrets.MustGetField("SLACK"),
+			key:     testSecrets.MustGetField(t, "SLACK"),
 			want:    string(expectedOutput),
 			wantErr: false,
 		},

@@ -24,10 +24,10 @@ func TestAxonaut_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	url := testSecrets.MustGetField("AZURE_API_MGMT_REPOSITORY_KEY_URL")
-	inactiveUrl := testSecrets.MustGetField("AZURE_API_MGMT_REPOSITORY_KEY_URL_INACTIVE")
-	password := testSecrets.MustGetField("AZURE_API_MGMT_REPOSITORY_KEY_PASSWORD")
-	inactivePassword := testSecrets.MustGetField("AZURE_API_MGMT_REPOSITORY_KEY_PASSWORD_INACTIVE")
+	url := testSecrets.MustGetField(t, "AZURE_API_MGMT_REPOSITORY_KEY_URL")
+	inactiveUrl := testSecrets.MustGetField(t, "AZURE_API_MGMT_REPOSITORY_KEY_URL_INACTIVE")
+	password := testSecrets.MustGetField(t, "AZURE_API_MGMT_REPOSITORY_KEY_PASSWORD")
+	inactivePassword := testSecrets.MustGetField(t, "AZURE_API_MGMT_REPOSITORY_KEY_PASSWORD_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -111,7 +111,7 @@ func TestAxonaut_FromChunk(t *testing.T) {
 			}
 
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "ExtraData", "SecretParts")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("AzureApiManagementRepositoryKey.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

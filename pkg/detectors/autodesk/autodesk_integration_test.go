@@ -23,9 +23,9 @@ func TestAutodesk_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	id := testSecrets.MustGetField("AUTODESK_ID")
-	secret := testSecrets.MustGetField("AUTODESK_SECRET")
-	inactiveID := testSecrets.MustGetField("AUTODESK_INACTIVE")
+	id := testSecrets.MustGetField(t, "AUTODESK_ID")
+	secret := testSecrets.MustGetField(t, "AUTODESK_SECRET")
+	inactiveID := testSecrets.MustGetField(t, "AUTODESK_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

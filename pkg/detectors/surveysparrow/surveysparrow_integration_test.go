@@ -23,8 +23,8 @@ func TestSurveySparrow_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("SURVEYSPARROW_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("SURVEYSPARROW_INACTIVE")
+	secret := testSecrets.MustGetField(t, "SURVEYSPARROW_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "SURVEYSPARROW_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

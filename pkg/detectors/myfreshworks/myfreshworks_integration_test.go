@@ -24,9 +24,9 @@ func TestMyfreshworks_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("MYFRESHWORKS_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("MYFRESHWORKS_INACTIVE")
-	domain := testSecrets.MustGetField("MYFRESHWORKS_DOMAIN")
+	secret := testSecrets.MustGetField(t, "MYFRESHWORKS_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "MYFRESHWORKS_INACTIVE")
+	domain := testSecrets.MustGetField(t, "MYFRESHWORKS_DOMAIN")
 
 	type args struct {
 		ctx    context.Context
@@ -132,7 +132,7 @@ func TestMyfreshworks_FromChunk(t *testing.T) {
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("Myfreshworks.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

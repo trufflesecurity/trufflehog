@@ -23,8 +23,8 @@ func TestOpenCageData_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("OPENCAGEDATA")
-	inactiveSecret := testSecrets.MustGetField("OPENCAGEDATA_INACTIVE")
+	secret := testSecrets.MustGetField(t, "OPENCAGEDATA")
+	inactiveSecret := testSecrets.MustGetField(t, "OPENCAGEDATA_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

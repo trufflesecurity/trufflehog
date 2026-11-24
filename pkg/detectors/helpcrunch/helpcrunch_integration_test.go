@@ -23,8 +23,8 @@ func TestHelpCrunch_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("HELPCRUNCH_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("HELPCRUNCH_INACTIVE")
+	secret := testSecrets.MustGetField(t, "HELPCRUNCH_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "HELPCRUNCH_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

@@ -27,8 +27,8 @@ func TestAppSync_FromData(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	activeKey := testSecrets.MustGetField("APPSYNC_API_KEY")
-	endpoint := testSecrets.MustGetField("APPSYNC_API_URL")
+	activeKey := testSecrets.MustGetField(t, "APPSYNC_API_KEY")
+	endpoint := testSecrets.MustGetField(t, "APPSYNC_API_URL")
 
 	revokedEndpoint := "https://nr2nchyfwvc53lgrlvsa2pfpzq.appsync-api.us-east-1.amazonaws.com/graphql"
 	inactiveKey := "da2-abcdefghijklmnopqrstuvwxyz"
@@ -176,7 +176,7 @@ func TestAppSync_FromData(t *testing.T) {
 				"SecretParts",
 			)
 
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("AppSync.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

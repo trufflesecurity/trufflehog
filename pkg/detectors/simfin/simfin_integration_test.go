@@ -23,8 +23,8 @@ func TestSimFin_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("SIMFIN")
-	inactiveSecret := testSecrets.MustGetField("SIMFIN_INACTIVE")
+	secret := testSecrets.MustGetField(t, "SIMFIN")
+	inactiveSecret := testSecrets.MustGetField(t, "SIMFIN_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

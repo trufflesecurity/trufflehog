@@ -23,9 +23,9 @@ func TestYoutubeApiKey_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("YOUTUBEAPIKEY_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("YOUTUBEAPIKEY_INACTIVE")
-	id := testSecrets.MustGetField("YOUTUBEAPIKEY_CHANNELID")
+	secret := testSecrets.MustGetField(t, "YOUTUBEAPIKEY_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "YOUTUBEAPIKEY_INACTIVE")
+	id := testSecrets.MustGetField(t, "YOUTUBEAPIKEY_CHANNELID")
 
 	type args struct {
 		ctx    context.Context

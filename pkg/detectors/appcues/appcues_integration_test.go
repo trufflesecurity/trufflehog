@@ -23,10 +23,10 @@ func TestAppcues_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("APPCUES")
-	user := testSecrets.MustGetField("APPCUES_USER")
-	id := testSecrets.MustGetField("APPCUES_ID")
-	inactiveSecret := testSecrets.MustGetField("APPCUES_INACTIVE")
+	secret := testSecrets.MustGetField(t, "APPCUES")
+	user := testSecrets.MustGetField(t, "APPCUES_USER")
+	id := testSecrets.MustGetField(t, "APPCUES_ID")
+	inactiveSecret := testSecrets.MustGetField(t, "APPCUES_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

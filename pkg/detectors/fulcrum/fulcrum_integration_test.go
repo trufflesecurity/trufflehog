@@ -23,8 +23,8 @@ func TestFulcrum_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("FULLCRUM")
-	inactiveSecret := testSecrets.MustGetField("FULLCRUM_INACTIVE")
+	secret := testSecrets.MustGetField(t, "FULLCRUM")
+	inactiveSecret := testSecrets.MustGetField(t, "FULLCRUM_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

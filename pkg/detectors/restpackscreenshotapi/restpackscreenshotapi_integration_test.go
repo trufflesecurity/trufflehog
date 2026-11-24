@@ -23,8 +23,8 @@ func TestRestpackScreenshotAPI_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("RESTPACKSCREENSHOTAPI")
-	inactiveSecret := testSecrets.MustGetField("RESTPACKSCREENSHOTAPI_INACTIVE")
+	secret := testSecrets.MustGetField(t, "RESTPACKSCREENSHOTAPI")
+	inactiveSecret := testSecrets.MustGetField(t, "RESTPACKSCREENSHOTAPI_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

@@ -23,8 +23,8 @@ func TestUptimeRobot_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("UPTIMEROBOT")
-	inactiveSecret := testSecrets.MustGetField("UPTIMEROBOT_INACTIVE")
+	secret := testSecrets.MustGetField(t, "UPTIMEROBOT")
+	inactiveSecret := testSecrets.MustGetField(t, "UPTIMEROBOT_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

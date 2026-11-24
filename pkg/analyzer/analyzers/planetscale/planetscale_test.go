@@ -33,8 +33,8 @@ func TestAnalyzer_Analyze(t *testing.T) {
 	}{
 		{
 			name:    "valid planetscale id and key",
-			id:      testSecrets.MustGetField("PLANET_SCALE_ID"),
-			token:   testSecrets.MustGetField("PLANET_SCALE_TOKEN"),
+			id:      testSecrets.MustGetField(t, "PLANET_SCALE_ID"),
+			token:   testSecrets.MustGetField(t, "PLANET_SCALE_TOKEN"),
 			want:    string(expectedOutput),
 			wantErr: false,
 		},

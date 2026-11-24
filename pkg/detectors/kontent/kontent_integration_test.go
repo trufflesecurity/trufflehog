@@ -24,9 +24,9 @@ func TestKontent_FromChunk(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	envID := testSecrets.MustGetField("KONTENT_ENV_ID")
-	secret := testSecrets.MustGetField("KONTENT_API_KEY")
-	inactiveSecret := testSecrets.MustGetField("KONTENT_INACTIVE")
+	envID := testSecrets.MustGetField(t, "KONTENT_ENV_ID")
+	secret := testSecrets.MustGetField(t, "KONTENT_API_KEY")
+	inactiveSecret := testSecrets.MustGetField(t, "KONTENT_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

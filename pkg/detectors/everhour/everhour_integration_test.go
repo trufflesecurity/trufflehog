@@ -23,8 +23,8 @@ func TestEverhour_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("EVERHOUR")
-	inactiveSecret := testSecrets.MustGetField("EVERHOUR_INACTIVE")
+	secret := testSecrets.MustGetField(t, "EVERHOUR")
+	inactiveSecret := testSecrets.MustGetField(t, "EVERHOUR_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

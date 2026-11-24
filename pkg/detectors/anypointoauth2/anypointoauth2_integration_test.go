@@ -24,9 +24,9 @@ func TestAnypointOAuth2_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	clientID := testSecrets.MustGetField("ANYPOINT_CLIENT_ID")
-	clientSecret := testSecrets.MustGetField("ANYPOINT_CLIENT_SECRET")
-	inactiveSecret := testSecrets.MustGetField("ANYPOINT_INACTIVE_SECRET")
+	clientID := testSecrets.MustGetField(t, "ANYPOINT_CLIENT_ID")
+	clientSecret := testSecrets.MustGetField(t, "ANYPOINT_CLIENT_SECRET")
+	inactiveSecret := testSecrets.MustGetField(t, "ANYPOINT_INACTIVE_SECRET")
 
 	type args struct {
 		ctx    context.Context
@@ -109,7 +109,7 @@ func TestAnypointOAuth2_FromChunk(t *testing.T) {
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "primarySecret")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("AnypointOAuth2.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

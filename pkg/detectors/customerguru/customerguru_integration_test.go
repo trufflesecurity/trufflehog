@@ -23,9 +23,9 @@ func TestCustomerGuru_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("CUSTOMERGURU_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("CUSTOMERGURU_INACTIVE")
-	key := testSecrets.MustGetField("CUSTOMERGURU_KEY")
+	secret := testSecrets.MustGetField(t, "CUSTOMERGURU_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "CUSTOMERGURU_INACTIVE")
+	key := testSecrets.MustGetField(t, "CUSTOMERGURU_KEY")
 
 	type args struct {
 		ctx    context.Context

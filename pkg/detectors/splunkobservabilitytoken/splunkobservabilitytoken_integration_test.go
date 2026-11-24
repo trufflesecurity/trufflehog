@@ -23,8 +23,8 @@ func TestSplunkObservabilityToken_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("SPLUNK_ACCESS_TOKEN") // TODO: rename
-	inactiveSecret := testSecrets.MustGetField("SPLUNK_ACCESS_INACTIVE")
+	secret := testSecrets.MustGetField(t, "SPLUNK_ACCESS_TOKEN") // TODO: rename
+	inactiveSecret := testSecrets.MustGetField(t, "SPLUNK_ACCESS_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

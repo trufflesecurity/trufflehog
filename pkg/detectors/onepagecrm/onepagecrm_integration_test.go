@@ -23,9 +23,9 @@ func TestOnepageCRM_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("ONEPAGECRM")
-	user := testSecrets.MustGetField("ONEPAGECRM_USER")
-	inactiveSecret := testSecrets.MustGetField("ONEPAGECRM_INACTIVE")
+	secret := testSecrets.MustGetField(t, "ONEPAGECRM")
+	user := testSecrets.MustGetField(t, "ONEPAGECRM_USER")
+	inactiveSecret := testSecrets.MustGetField(t, "ONEPAGECRM_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

@@ -23,9 +23,9 @@ func TestSugester_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("SUGESTER")
-	domain := testSecrets.MustGetField("SUGESTER_DOMAIN")
-	inactiveSecret := testSecrets.MustGetField("SUGESTER_INACTIVE")
+	secret := testSecrets.MustGetField(t, "SUGESTER")
+	domain := testSecrets.MustGetField(t, "SUGESTER_DOMAIN")
+	inactiveSecret := testSecrets.MustGetField(t, "SUGESTER_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

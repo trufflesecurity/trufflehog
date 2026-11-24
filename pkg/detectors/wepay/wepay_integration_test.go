@@ -23,9 +23,9 @@ func TestWePay_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("WEPAY_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("WEPAY_INACTIVE")
-	appID := testSecrets.MustGetField("WEPAY_APPID")
+	secret := testSecrets.MustGetField(t, "WEPAY_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "WEPAY_INACTIVE")
+	appID := testSecrets.MustGetField(t, "WEPAY_APPID")
 
 	type args struct {
 		ctx    context.Context

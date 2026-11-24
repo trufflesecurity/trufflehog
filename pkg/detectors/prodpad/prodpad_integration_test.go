@@ -23,8 +23,8 @@ func TestProdpad_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("PRODPAD")
-	inactiveSecret := testSecrets.MustGetField("PRODPAD_INACTIVE")
+	secret := testSecrets.MustGetField(t, "PRODPAD")
+	inactiveSecret := testSecrets.MustGetField(t, "PRODPAD_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

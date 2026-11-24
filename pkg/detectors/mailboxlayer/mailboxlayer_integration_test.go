@@ -23,8 +23,8 @@ func TestMailboxplayer_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("MAILBOXPLAYER_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("MAILBOXPLAYER_INACTIVE")
+	secret := testSecrets.MustGetField(t, "MAILBOXPLAYER_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "MAILBOXPLAYER_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

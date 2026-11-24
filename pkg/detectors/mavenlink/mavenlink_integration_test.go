@@ -23,8 +23,8 @@ func TestMavenlink_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("MAVENLINK")
-	inactiveSecret := testSecrets.MustGetField("MAVENLINK_INACTIVE")
+	secret := testSecrets.MustGetField(t, "MAVENLINK")
+	inactiveSecret := testSecrets.MustGetField(t, "MAVENLINK_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

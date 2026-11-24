@@ -23,8 +23,8 @@ func TestTerraformCloudPersonalToken_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("TERRAFORMCLOUDPERSONALTOKEN_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("TERRAFORMCLOUDPERSONALTOKEN_INACTIVE")
+	secret := testSecrets.MustGetField(t, "TERRAFORMCLOUDPERSONALTOKEN_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "TERRAFORMCLOUDPERSONALTOKEN_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

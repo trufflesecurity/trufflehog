@@ -23,8 +23,8 @@ func TestLoadmill_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("LOADMILL")
-	inactiveSecret := testSecrets.MustGetField("LOADMILL_INACTIVE")
+	secret := testSecrets.MustGetField(t, "LOADMILL")
+	inactiveSecret := testSecrets.MustGetField(t, "LOADMILL_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

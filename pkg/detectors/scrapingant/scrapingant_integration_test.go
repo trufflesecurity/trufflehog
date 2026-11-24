@@ -23,8 +23,8 @@ func TestScrapingAnt_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("SCRAPINGANT")
-	inactiveSecret := testSecrets.MustGetField("SCRAPINGANT_INACTIVE")
+	secret := testSecrets.MustGetField(t, "SCRAPINGANT")
+	inactiveSecret := testSecrets.MustGetField(t, "SCRAPINGANT_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

@@ -25,8 +25,8 @@ func TestVagrantcloudpersonaltoken_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("VAGRANTCLOUDPERSONALTOKEN")
-	inactiveSecret := testSecrets.MustGetField("VAGRANTCLOUDPERSONALTOKEN_INACTIVE")
+	secret := testSecrets.MustGetField(t, "VAGRANTCLOUDPERSONALTOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "VAGRANTCLOUDPERSONALTOKEN_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -104,7 +104,7 @@ func TestVagrantcloudpersonaltoken_FromChunk(t *testing.T) {
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("Vagrantcloudpersonaltoken.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

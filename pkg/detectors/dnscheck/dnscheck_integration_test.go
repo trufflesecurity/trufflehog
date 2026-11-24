@@ -23,9 +23,9 @@ func TestDnscheck_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("DNSCHECK")
-	inactiveSecret := testSecrets.MustGetField("DNSCHECK_INACTIVE")
-	id := testSecrets.MustGetField("DNSCHECK_ID")
+	secret := testSecrets.MustGetField(t, "DNSCHECK")
+	inactiveSecret := testSecrets.MustGetField(t, "DNSCHECK_INACTIVE")
+	id := testSecrets.MustGetField(t, "DNSCHECK_ID")
 
 	type args struct {
 		ctx    context.Context

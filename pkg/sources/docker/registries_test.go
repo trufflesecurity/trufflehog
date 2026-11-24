@@ -50,7 +50,7 @@ func TestGHCRListImages(t *testing.T) {
 	}
 
 	// For the personal access token test
-	githubToken := secret.MustGetField("GITHUB_PACKAGES_TEST")
+	githubToken := secret.MustGetField(t, "GITHUB_PACKAGES_TEST")
 
 	ghcr := MakeRegistryFromNamespace("ghcr.io/mongodb")
 	ghcr.WithRegistryToken(githubToken) // authentication is required for GHCR

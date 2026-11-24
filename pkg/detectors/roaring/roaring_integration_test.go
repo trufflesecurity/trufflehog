@@ -23,9 +23,9 @@ func TestRoaring_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	client := testSecrets.MustGetField("ROARING_CLIENT")
-	secret := testSecrets.MustGetField("ROARING_SECRET")
-	inactiveClient := testSecrets.MustGetField("ROARING_INACTIVE")
+	client := testSecrets.MustGetField(t, "ROARING_CLIENT")
+	secret := testSecrets.MustGetField(t, "ROARING_SECRET")
+	inactiveClient := testSecrets.MustGetField(t, "ROARING_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

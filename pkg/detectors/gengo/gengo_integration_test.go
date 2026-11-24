@@ -23,10 +23,10 @@ func TestGengo_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	key := testSecrets.MustGetField("GENGO_KEY")
-	inactiveKey := testSecrets.MustGetField("GENGO_KEY_INACTIVE")
-	secret := testSecrets.MustGetField("GENGO")
-	inactiveSecret := testSecrets.MustGetField("GENGO_INACTIVE")
+	key := testSecrets.MustGetField(t, "GENGO_KEY")
+	inactiveKey := testSecrets.MustGetField(t, "GENGO_KEY_INACTIVE")
+	secret := testSecrets.MustGetField(t, "GENGO")
+	inactiveSecret := testSecrets.MustGetField(t, "GENGO_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

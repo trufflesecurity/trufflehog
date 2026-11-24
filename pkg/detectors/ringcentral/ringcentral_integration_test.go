@@ -23,9 +23,9 @@ func TestRingcentral_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("RINGCENTRAL")
-	uri := testSecrets.MustGetField("REDIRECTURI")
-	inactiveSecret := testSecrets.MustGetField("RINGCENTRAL_INACTIVE")
+	secret := testSecrets.MustGetField(t, "RINGCENTRAL")
+	uri := testSecrets.MustGetField(t, "REDIRECTURI")
+	inactiveSecret := testSecrets.MustGetField(t, "RINGCENTRAL_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

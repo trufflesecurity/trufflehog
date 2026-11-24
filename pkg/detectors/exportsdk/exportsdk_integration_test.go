@@ -23,9 +23,9 @@ func TestExportSDK_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("EXPORTSDK")
-	id := testSecrets.MustGetField("EXPORTSDK_TEMPLATE")
-	inactiveSecret := testSecrets.MustGetField("EXPORTSDK_INACTIVE")
+	secret := testSecrets.MustGetField(t, "EXPORTSDK")
+	id := testSecrets.MustGetField(t, "EXPORTSDK_TEMPLATE")
+	inactiveSecret := testSecrets.MustGetField(t, "EXPORTSDK_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

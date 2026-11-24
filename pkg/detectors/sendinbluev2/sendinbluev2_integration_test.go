@@ -23,8 +23,8 @@ func TestSendinBlueV2_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("SENDINBLUEV2_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("SENDINBLUEV2_INACTIVE")
+	secret := testSecrets.MustGetField(t, "SENDINBLUEV2_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "SENDINBLUEV2_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

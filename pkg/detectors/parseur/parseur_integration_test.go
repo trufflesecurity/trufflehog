@@ -24,8 +24,8 @@ func TestParseur_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("PARSEUR")
-	inactiveSecret := testSecrets.MustGetField("PARSEUR_INACTIVE")
+	secret := testSecrets.MustGetField(t, "PARSEUR")
+	inactiveSecret := testSecrets.MustGetField(t, "PARSEUR_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

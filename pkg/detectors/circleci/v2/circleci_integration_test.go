@@ -23,8 +23,8 @@ func TestCircleCI_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("CIRCLECI")
-	secretInactive := testSecrets.MustGetField("CIRCLECI_INACTIVE")
+	secret := testSecrets.MustGetField(t, "CIRCLECI")
+	secretInactive := testSecrets.MustGetField(t, "CIRCLECI_INACTIVE")
 	type args struct {
 		ctx    context.Context
 		data   []byte

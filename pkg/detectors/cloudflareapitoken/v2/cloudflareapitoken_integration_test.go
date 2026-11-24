@@ -24,11 +24,11 @@ func TestCloudflareApiTokenV2_FromChunk(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	userToken := testSecrets.MustGetField("CLOUDFLARE_USER_API_TOKEN_V2")
-	userTokenInactive := testSecrets.MustGetField("CLOUDFLARE_USER_API_TOKEN_V2_INACTIVE")
-	accountToken := testSecrets.MustGetField("CLOUDFLARE_ACCOUNT_API_TOKEN_V2")
-	accountID := testSecrets.MustGetField("CLOUDFLARE_ACCOUNT_API_TOKEN_V2_ACCOUNT_ID")
-	accountTokenInactive := testSecrets.MustGetField("CLOUDFLARE_ACCOUNT_API_TOKEN_V2_INACTIVE")
+	userToken := testSecrets.MustGetField(t, "CLOUDFLARE_USER_API_TOKEN_V2")
+	userTokenInactive := testSecrets.MustGetField(t, "CLOUDFLARE_USER_API_TOKEN_V2_INACTIVE")
+	accountToken := testSecrets.MustGetField(t, "CLOUDFLARE_ACCOUNT_API_TOKEN_V2")
+	accountID := testSecrets.MustGetField(t, "CLOUDFLARE_ACCOUNT_API_TOKEN_V2_ACCOUNT_ID")
+	accountTokenInactive := testSecrets.MustGetField(t, "CLOUDFLARE_ACCOUNT_API_TOKEN_V2_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

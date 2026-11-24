@@ -23,8 +23,8 @@ func TestDeepseek_FromChunk(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	apiKey := testSecrets.MustGetField("DEEPSEEK")
-	inactiveSecret := testSecrets.MustGetField("DEEPSEEK_INACTIVE")
+	apiKey := testSecrets.MustGetField(t, "DEEPSEEK")
+	inactiveSecret := testSecrets.MustGetField(t, "DEEPSEEK_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -127,7 +127,7 @@ func TestDeepseek_FromChunk(t *testing.T) {
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "SecretParts")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("Deepseek.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

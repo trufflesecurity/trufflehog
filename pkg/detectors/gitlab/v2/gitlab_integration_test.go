@@ -25,8 +25,8 @@ func TestGitlabV2_FromChunk_WithV1Secrets(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("GITLAB")
-	secretInactive := testSecrets.MustGetField("GITLAB_INACTIVE")
+	secret := testSecrets.MustGetField(t, "GITLAB")
+	secretInactive := testSecrets.MustGetField(t, "GITLAB_INACTIVE")
 	type args struct {
 		ctx    context.Context
 		data   []byte
@@ -104,7 +104,7 @@ func TestGitlabV2_FromChunk_WithV1Secrets(t *testing.T) {
 				got[i].SecretParts = nil
 			}
 			opts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "primarySecret")
-			if diff := cmp.Diff(got, tt.want, opts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, opts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("Gitlab.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
@@ -119,8 +119,8 @@ func TestGitlabV2_FromChunk_WithV3Secrets(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("GITLABV3")
-	secretInactive := testSecrets.MustGetField("GITLABV3_INACTIVE")
+	secret := testSecrets.MustGetField(t, "GITLABV3")
+	secretInactive := testSecrets.MustGetField(t, "GITLABV3_INACTIVE")
 	type args struct {
 		ctx    context.Context
 		data   []byte
@@ -198,7 +198,7 @@ func TestGitlabV2_FromChunk_WithV3Secrets(t *testing.T) {
 				got[i].SecretParts = nil
 			}
 			opts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "primarySecret")
-			if diff := cmp.Diff(got, tt.want, opts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, opts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("Gitlab.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
@@ -228,8 +228,8 @@ func TestGitlabV2_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("GITLABV2")
-	secretInactive := testSecrets.MustGetField("GITLABV2_INACTIVE")
+	secret := testSecrets.MustGetField(t, "GITLABV2")
+	secretInactive := testSecrets.MustGetField(t, "GITLABV2_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -398,7 +398,7 @@ func TestGitlabV2_FromChunk(t *testing.T) {
 				got[i].SecretParts = nil
 			}
 			opts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "primarySecret")
-			if diff := cmp.Diff(got, tt.want, opts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, opts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("Gitlab.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

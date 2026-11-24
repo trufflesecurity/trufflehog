@@ -23,8 +23,8 @@ func TestIntrinio_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("INTRINIO")
-	inactiveSecret := testSecrets.MustGetField("INTRINIO_INACTIVE")
+	secret := testSecrets.MustGetField(t, "INTRINIO")
+	inactiveSecret := testSecrets.MustGetField(t, "INTRINIO_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

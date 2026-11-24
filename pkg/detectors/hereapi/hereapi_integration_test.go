@@ -23,8 +23,8 @@ func TestHereAPI_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("HEREAPI")
-	inactiveSecret := testSecrets.MustGetField("HEREAPI_INACTIVE")
+	secret := testSecrets.MustGetField(t, "HEREAPI")
+	inactiveSecret := testSecrets.MustGetField(t, "HEREAPI_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

@@ -23,8 +23,8 @@ func TestTelnyx_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("TELNYX")
-	inactiveSecret := testSecrets.MustGetField("TELNYX_INACTIVE")
+	secret := testSecrets.MustGetField(t, "TELNYX")
+	inactiveSecret := testSecrets.MustGetField(t, "TELNYX_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

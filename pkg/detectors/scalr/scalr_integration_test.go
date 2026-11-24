@@ -23,9 +23,9 @@ func TestScalr_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("SCALR")
-	inactiveSecret := testSecrets.MustGetField("SCALR_INACTIVE")
-	id := testSecrets.MustGetField("SCALR_DOMAIN")
+	secret := testSecrets.MustGetField(t, "SCALR")
+	inactiveSecret := testSecrets.MustGetField(t, "SCALR_INACTIVE")
+	id := testSecrets.MustGetField(t, "SCALR_DOMAIN")
 
 	type args struct {
 		ctx    context.Context

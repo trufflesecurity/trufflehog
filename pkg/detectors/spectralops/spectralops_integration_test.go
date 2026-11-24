@@ -27,7 +27,7 @@ func TestSpectralOps_FromData(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	activeToken := testSecrets.MustGetField("SPECTRALOPS_PERSONAL_TOKEN")
+	activeToken := testSecrets.MustGetField(t, "SPECTRALOPS_PERSONAL_TOKEN")
 	inactiveToken := "spu-3f10194ca38240ddb880bab79492384b"
 
 	type args struct {
@@ -150,7 +150,7 @@ func TestSpectralOps_FromData(t *testing.T) {
 				"SecretParts",
 			)
 
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("SpectralOps.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

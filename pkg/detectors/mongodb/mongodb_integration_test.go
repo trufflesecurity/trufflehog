@@ -6,6 +6,7 @@ package mongodb
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/mongodb"
 	"github.com/testcontainers/testcontainers-go/wait"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
@@ -174,7 +176,7 @@ func TestIntegrationMongoDB_FromChunk(t *testing.T) {
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "RawV2", "verificationError", "SecretParts", "ExtraData")
-			if diff := cmp.Diff(tt.want, got, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(tt.want, got, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("MongoDB.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
@@ -188,8 +190,8 @@ func TestMongoDB_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("MONGODB_URI")
-	inactiveSecret := testSecrets.MustGetField("MONGODB_INACTIVE_URI")
+	secret := testSecrets.MustGetField(t, "MONGODB_URI")
+	inactiveSecret := testSecrets.MustGetField(t, "MONGODB_INACTIVE_URI")
 
 	type args struct {
 		ctx    context.Context
@@ -311,7 +313,7 @@ func TestMongoDB_FromChunk(t *testing.T) {
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "RawV2", "verificationError", "SecretParts", "ExtraData")
-			if diff := cmp.Diff(tt.want, got, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(tt.want, got, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("MongoDB.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

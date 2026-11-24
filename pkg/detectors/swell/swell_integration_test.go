@@ -23,9 +23,9 @@ func TestSwell_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("SWELL")
-	id := testSecrets.MustGetField("SWELL_ID")
-	inactiveSecret := testSecrets.MustGetField("SWELL_INACTIVE")
+	secret := testSecrets.MustGetField(t, "SWELL")
+	id := testSecrets.MustGetField(t, "SWELL_ID")
+	inactiveSecret := testSecrets.MustGetField(t, "SWELL_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

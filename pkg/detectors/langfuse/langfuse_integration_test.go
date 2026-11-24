@@ -24,11 +24,10 @@ func TestLangfuse_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	publicKey := testSecrets.MustGetField("LANGFUSE_PUBLIC_KEY")
-	secretKey := testSecrets.MustGetField("LANGFUSE_SECRET_KEY")
-	inactivePublicKey := testSecrets.MustGetField("LANGFUSE_INACTIVE_PUBLIC_KEY")
-	inactiveSecretKey := testSecrets.MustGetField("LANGFUSE_INACTIVE_SECRET_KEY")
-
+	publicKey := testSecrets.MustGetField(t, "LANGFUSE_PUBLIC_KEY")
+	secretKey := testSecrets.MustGetField(t, "LANGFUSE_SECRET_KEY")
+	inactivePublicKey := testSecrets.MustGetField(t, "LANGFUSE_INACTIVE_PUBLIC_KEY")
+	inactiveSecretKey := testSecrets.MustGetField(t, "LANGFUSE_INACTIVE_SECRET_KEY")
 
 	type args struct {
 		ctx    context.Context
@@ -140,7 +139,7 @@ func TestLangfuse_FromChunk(t *testing.T) {
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("Langfuse.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

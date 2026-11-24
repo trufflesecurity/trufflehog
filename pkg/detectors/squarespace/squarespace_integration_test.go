@@ -23,8 +23,8 @@ func TestSquarespace_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("SQUARESPACE_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("SQUARESPACE_INACTIVE")
+	secret := testSecrets.MustGetField(t, "SQUARESPACE_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "SQUARESPACE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
