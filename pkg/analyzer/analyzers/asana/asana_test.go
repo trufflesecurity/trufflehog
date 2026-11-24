@@ -32,7 +32,7 @@ func TestAnalyzer_Analyze(t *testing.T) {
 	}{
 		{
 			name:    "valid Asana OAUTH Token",
-			key:     testSecrets.MustGetField("ASANAOAUTH_TOKEN"),
+			key:     testSecrets.MustGetField(t, "ASANAOAUTH_TOKEN"),
 			want:    string(expectedOutput),
 			wantErr: false,
 		},

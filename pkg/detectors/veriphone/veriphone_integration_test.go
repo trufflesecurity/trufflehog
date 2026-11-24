@@ -23,8 +23,8 @@ func TestVeriphone_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("VERIPHONE")
-	inactiveSecret := testSecrets.MustGetField("VERIPHONE_INACTIVE")
+	secret := testSecrets.MustGetField(t, "VERIPHONE")
+	inactiveSecret := testSecrets.MustGetField(t, "VERIPHONE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

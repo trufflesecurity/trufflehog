@@ -23,8 +23,8 @@ func TestOnesignal_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("ONESIGNAL")
-	inactiveSecret := testSecrets.MustGetField("ONESIGNAL_INACTIVE")
+	secret := testSecrets.MustGetField(t, "ONESIGNAL")
+	inactiveSecret := testSecrets.MustGetField(t, "ONESIGNAL_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

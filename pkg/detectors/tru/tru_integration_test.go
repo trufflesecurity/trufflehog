@@ -23,9 +23,9 @@ func TestTru_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	id := testSecrets.MustGetField("TRU_ID")
-	secret := testSecrets.MustGetField("TRU_SECRET")
-	inactiveID := testSecrets.MustGetField("TRU_INACTIVE")
+	id := testSecrets.MustGetField(t, "TRU_ID")
+	secret := testSecrets.MustGetField(t, "TRU_SECRET")
+	inactiveID := testSecrets.MustGetField(t, "TRU_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

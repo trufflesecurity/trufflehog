@@ -23,8 +23,8 @@ func TestMailmodo_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("MAILMODO_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("MAILMODO_INACTIVE")
+	secret := testSecrets.MustGetField(t, "MAILMODO_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "MAILMODO_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

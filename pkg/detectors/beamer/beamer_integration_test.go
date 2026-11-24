@@ -23,8 +23,8 @@ func TestBeamer_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("BEAMER_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("BEAMER_INACTIVE")
+	secret := testSecrets.MustGetField(t, "BEAMER_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "BEAMER_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

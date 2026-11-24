@@ -23,8 +23,8 @@ func TestGraphhopper_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("GRAPHHOPPER")
-	inactiveSecret := testSecrets.MustGetField("GRAPHHOPPER_INACTIVE")
+	secret := testSecrets.MustGetField(t, "GRAPHHOPPER")
+	inactiveSecret := testSecrets.MustGetField(t, "GRAPHHOPPER_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

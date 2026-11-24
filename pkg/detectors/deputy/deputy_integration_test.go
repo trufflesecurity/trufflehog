@@ -23,9 +23,9 @@ func TestDeputy_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("DEPUTY")
-	url := testSecrets.MustGetField("DEPUTY_URL")
-	inactiveSecret := testSecrets.MustGetField("DEPUTY_INACTIVE")
+	secret := testSecrets.MustGetField(t, "DEPUTY")
+	url := testSecrets.MustGetField(t, "DEPUTY_URL")
+	inactiveSecret := testSecrets.MustGetField(t, "DEPUTY_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

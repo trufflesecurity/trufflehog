@@ -23,8 +23,8 @@ func TestHunter_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("HUNTER_IO_API_KEY")
-	secretInactive := testSecrets.MustGetField("HUNTER_IO_API_KEY_INACTIVE")
+	secret := testSecrets.MustGetField(t, "HUNTER_IO_API_KEY")
+	secretInactive := testSecrets.MustGetField(t, "HUNTER_IO_API_KEY_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

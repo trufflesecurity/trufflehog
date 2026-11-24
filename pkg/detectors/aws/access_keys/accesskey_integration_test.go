@@ -37,13 +37,13 @@ func TestAWS_FromChunk_InvalidValidReuseIDSequence(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("AWS")
-	id := testSecrets.MustGetField("AWS_ID")
-	inactiveSecret := testSecrets.MustGetField("AWS_INACTIVE")
+	secret := testSecrets.MustGetField(t, "AWS")
+	id := testSecrets.MustGetField(t, "AWS_ID")
+	inactiveSecret := testSecrets.MustGetField(t, "AWS_INACTIVE")
 
 	d := scanner{}
 
-	ignoreOpts := []cmp.Option{cmpopts.IgnoreFields(detectors.Result{}, "RawV2", "Raw", "verificationError")}
+	ignoreOpts := []cmp.Option{cmpopts.IgnoreFields(detectors.Result{}, "RawV2", "Raw", "verificationError"), cmpopts.IgnoreUnexported(detectors.Result{})}
 
 	got, err := d.FromData(ctx, true, []byte(fmt.Sprintf("aws %s %s", id, inactiveSecret)))
 	if assert.NoError(t, err) {
@@ -92,9 +92,9 @@ func TestAWS_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("AWS")
-	id := testSecrets.MustGetField("AWS_ID")
-	inactiveSecret := testSecrets.MustGetField("AWS_INACTIVE")
+	secret := testSecrets.MustGetField(t, "AWS")
+	id := testSecrets.MustGetField(t, "AWS_ID")
+	inactiveSecret := testSecrets.MustGetField(t, "AWS_INACTIVE")
 	inactiveID := id[:len(id)-3] + "XYZ"
 
 	hash := gofakeit.Password(true, true, true, false, false, 10)
@@ -421,6 +421,7 @@ func TestAWS_FromChunk(t *testing.T) {
 			}
 			ignoreOpts := []cmp.Option{
 				cmpopts.IgnoreFields(detectors.Result{}, "RawV2", "Raw", "verificationError"),
+				cmpopts.IgnoreUnexported(detectors.Result{}),
 				cmpopts.SortSlices(func(x, y detectors.Result) bool {
 					return x.Redacted < y.Redacted
 				}),

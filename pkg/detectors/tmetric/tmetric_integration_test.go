@@ -23,8 +23,8 @@ func TestTmetric_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("TMETRIC")
-	inactiveSecret := testSecrets.MustGetField("TMETRIC_INACTIVE")
+	secret := testSecrets.MustGetField(t, "TMETRIC")
+	inactiveSecret := testSecrets.MustGetField(t, "TMETRIC_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

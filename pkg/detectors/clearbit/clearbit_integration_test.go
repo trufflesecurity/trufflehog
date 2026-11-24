@@ -23,8 +23,8 @@ func TestClearbit_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("CLEARBIT")
-	inactiveSecret := testSecrets.MustGetField("CLEARBIT_INACTIVE")
+	secret := testSecrets.MustGetField(t, "CLEARBIT")
+	inactiveSecret := testSecrets.MustGetField(t, "CLEARBIT_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

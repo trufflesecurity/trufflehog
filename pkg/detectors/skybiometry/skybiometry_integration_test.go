@@ -23,10 +23,10 @@ func TestSkyBiometry_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	key := testSecrets.MustGetField("SKYBIOMETRY_KEY")
-	inactiveKey := testSecrets.MustGetField("SKYBIOMETRY_KEY_INACTIVE")
-	secret := testSecrets.MustGetField("SKYBIOMETRY")
-	inactiveSecret := testSecrets.MustGetField("SKYBIOMETRY_INACTIVE")
+	key := testSecrets.MustGetField(t, "SKYBIOMETRY_KEY")
+	inactiveKey := testSecrets.MustGetField(t, "SKYBIOMETRY_KEY_INACTIVE")
+	secret := testSecrets.MustGetField(t, "SKYBIOMETRY")
+	inactiveSecret := testSecrets.MustGetField(t, "SKYBIOMETRY_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

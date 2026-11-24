@@ -23,8 +23,8 @@ func TestUclassify_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("UCLASSIFY")
-	inactiveSecret := testSecrets.MustGetField("UCLASSIFY_INACTIVE")
+	secret := testSecrets.MustGetField(t, "UCLASSIFY")
+	inactiveSecret := testSecrets.MustGetField(t, "UCLASSIFY_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

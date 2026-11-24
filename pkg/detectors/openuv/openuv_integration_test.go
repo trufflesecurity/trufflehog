@@ -23,8 +23,8 @@ func TestOpenuv_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("OPENUV")
-	inactiveSecret := testSecrets.MustGetField("OPENUV_INACTIVE")
+	secret := testSecrets.MustGetField(t, "OPENUV")
+	inactiveSecret := testSecrets.MustGetField(t, "OPENUV_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

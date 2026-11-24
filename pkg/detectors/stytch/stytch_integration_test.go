@@ -23,9 +23,9 @@ func TestStytch_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("STYTCH")
-	id := testSecrets.MustGetField("STYTCH_ID")
-	inactiveSecret := testSecrets.MustGetField("STYTCH_INACTIVE")
+	secret := testSecrets.MustGetField(t, "STYTCH")
+	id := testSecrets.MustGetField(t, "STYTCH_ID")
+	inactiveSecret := testSecrets.MustGetField(t, "STYTCH_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

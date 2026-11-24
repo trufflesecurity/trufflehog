@@ -23,8 +23,8 @@ func TestMediaStack_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("MEDIASTACK")
-	inactiveSecret := testSecrets.MustGetField("MEDIASTACK_INACTIVE")
+	secret := testSecrets.MustGetField(t, "MEDIASTACK")
+	inactiveSecret := testSecrets.MustGetField(t, "MEDIASTACK_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

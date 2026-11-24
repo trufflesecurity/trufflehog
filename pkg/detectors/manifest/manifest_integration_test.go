@@ -23,8 +23,8 @@ func TestManifest_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("MANIFEST")
-	inactiveSecret := testSecrets.MustGetField("MANIFEST_INACTIVE")
+	secret := testSecrets.MustGetField(t, "MANIFEST")
+	inactiveSecret := testSecrets.MustGetField(t, "MANIFEST_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

@@ -23,8 +23,8 @@ func TestCoveralls_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("COVERALLS_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("COVERALLS_INACTIVE")
+	secret := testSecrets.MustGetField(t, "COVERALLS_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "COVERALLS_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

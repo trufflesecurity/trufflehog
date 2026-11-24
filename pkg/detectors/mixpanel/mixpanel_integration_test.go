@@ -23,9 +23,9 @@ func TestMixpanel_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("MIXPANEL")
-	id := testSecrets.MustGetField("MIXPANEL_ID")
-	inactiveSecret := testSecrets.MustGetField("MIXPANEL_INACTIVE")
+	secret := testSecrets.MustGetField(t, "MIXPANEL")
+	id := testSecrets.MustGetField(t, "MIXPANEL_ID")
+	inactiveSecret := testSecrets.MustGetField(t, "MIXPANEL_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

@@ -23,8 +23,8 @@ func TestPandaScore_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("PANDASCORE")
-	inactiveSecret := testSecrets.MustGetField("PANDASCORE_INACTIVE")
+	secret := testSecrets.MustGetField(t, "PANDASCORE")
+	inactiveSecret := testSecrets.MustGetField(t, "PANDASCORE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

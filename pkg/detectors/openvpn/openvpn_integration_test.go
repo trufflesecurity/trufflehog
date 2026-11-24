@@ -26,10 +26,10 @@ func TestOpenvpn_FromChunk(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	domain := testSecrets.MustGetField("OPENVPN_DOMAIN")
-	clientId := testSecrets.MustGetField("OPENVPN_CLIENT_ID")
-	clientSecret := testSecrets.MustGetField("OPENVPN_CLIENT_SECRET")
-	inactiveClientSecret := testSecrets.MustGetField("OPENVPN_CLIENT_SECRET_INACTIVE")
+	domain := testSecrets.MustGetField(t, "OPENVPN_DOMAIN")
+	clientId := testSecrets.MustGetField(t, "OPENVPN_CLIENT_ID")
+	clientSecret := testSecrets.MustGetField(t, "OPENVPN_CLIENT_SECRET")
+	inactiveClientSecret := testSecrets.MustGetField(t, "OPENVPN_CLIENT_SECRET_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -109,7 +109,7 @@ func TestOpenvpn_FromChunk(t *testing.T) {
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("Openvpn.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

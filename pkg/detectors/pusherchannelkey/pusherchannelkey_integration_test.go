@@ -23,10 +23,10 @@ func TestPusherChannelKey_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	appId := testSecrets.MustGetField("PUSHER_APPID")
-	key := testSecrets.MustGetField("PUSHER_KEY")
-	secret := testSecrets.MustGetField("PUSHER_SECRET")
-	inactiveSecret := testSecrets.MustGetField("PUSHER_SECRET_INACTIVE")
+	appId := testSecrets.MustGetField(t, "PUSHER_APPID")
+	key := testSecrets.MustGetField(t, "PUSHER_KEY")
+	secret := testSecrets.MustGetField(t, "PUSHER_SECRET")
+	inactiveSecret := testSecrets.MustGetField(t, "PUSHER_SECRET_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

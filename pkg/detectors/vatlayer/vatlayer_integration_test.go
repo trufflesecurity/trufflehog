@@ -23,8 +23,8 @@ func TestVatLayer_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("VATLAYER")
-	inactiveSecret := testSecrets.MustGetField("VATLAYER_INACTIVE")
+	secret := testSecrets.MustGetField(t, "VATLAYER")
+	inactiveSecret := testSecrets.MustGetField(t, "VATLAYER_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

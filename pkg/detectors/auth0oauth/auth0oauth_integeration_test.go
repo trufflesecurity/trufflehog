@@ -24,16 +24,16 @@ func TestAuth0oauth_FromChunk(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	domain := testSecrets.MustGetField("AUTH0_DOMAIN")
-	clientId := testSecrets.MustGetField("AUTH0_CLIENT_ID")
-	clientSecret := testSecrets.MustGetField("AUTH0_CLIENT_SECRET")
+	domain := testSecrets.MustGetField(t, "AUTH0_DOMAIN")
+	clientId := testSecrets.MustGetField(t, "AUTH0_CLIENT_ID")
+	clientSecret := testSecrets.MustGetField(t, "AUTH0_CLIENT_SECRET")
 
-	domainUnauthorized := testSecrets.MustGetField("AUTH0_DOMAIN_UNAUTHORIZED")
-	clientIdUnauthorized := testSecrets.MustGetField("AUTH0_CLIENT_ID_UNAUTHORIZED")
-	clientSecretUnauthorized := testSecrets.MustGetField("AUTH0_CLIENT_SECRET_UNAUTHORIZED")
+	domainUnauthorized := testSecrets.MustGetField(t, "AUTH0_DOMAIN_UNAUTHORIZED")
+	clientIdUnauthorized := testSecrets.MustGetField(t, "AUTH0_CLIENT_ID_UNAUTHORIZED")
+	clientSecretUnauthorized := testSecrets.MustGetField(t, "AUTH0_CLIENT_SECRET_UNAUTHORIZED")
 
-	notFoundDomain := testSecrets.MustGetField("AUTH0_DOMAIN_NOT_FOUND")
-	inactiveClientSecret := testSecrets.MustGetField("AUTH0_CLIENT_SECRET_INACTIVE")
+	notFoundDomain := testSecrets.MustGetField(t, "AUTH0_DOMAIN_NOT_FOUND")
+	inactiveClientSecret := testSecrets.MustGetField(t, "AUTH0_CLIENT_SECRET_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

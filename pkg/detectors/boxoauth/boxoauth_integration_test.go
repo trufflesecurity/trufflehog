@@ -24,9 +24,9 @@ func TestBoxOauth_FromChunk(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	id := testSecrets.MustGetField("BOXOAUTH_ID")
-	secret := testSecrets.MustGetField("BOXOAUTH_SECRET")
-	invalidSecret := testSecrets.MustGetField("BOXOAUTH_INVALID_SECRET")
+	id := testSecrets.MustGetField(t, "BOXOAUTH_ID")
+	secret := testSecrets.MustGetField(t, "BOXOAUTH_SECRET")
+	invalidSecret := testSecrets.MustGetField(t, "BOXOAUTH_INVALID_SECRET")
 
 	// The analyzer test app shares the Box test tenant and comes with a subject
 	// ID it is authorized for, which is the only input Box will issue a token
@@ -35,9 +35,9 @@ func TestBoxOauth_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get analyzer test secrets from GCP: %s", err)
 	}
-	subjectClientID := analyzerSecrets.MustGetField("BOX_CLIENT_ID")
-	subjectClientSecret := analyzerSecrets.MustGetField("BOX_CLIENT_SECRET")
-	subjectID := analyzerSecrets.MustGetField("BOX_SUBJECT_ID")
+	subjectClientID := analyzerSecrets.MustGetField(t, "BOX_CLIENT_ID")
+	subjectClientSecret := analyzerSecrets.MustGetField(t, "BOX_CLIENT_SECRET")
+	subjectID := analyzerSecrets.MustGetField(t, "BOX_SUBJECT_ID")
 
 	unknownResult := detectors.Result{
 		DetectorType: detector_typepb.DetectorType_BoxOauth,

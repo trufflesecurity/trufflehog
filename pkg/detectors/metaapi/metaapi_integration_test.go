@@ -23,9 +23,9 @@ func TestMetaAPI_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("METAAPI")
-	inactiveSecret := testSecrets.MustGetField("METAAPI_INACTIVE")
-	spell := testSecrets.MustGetField("METAAPI_SPELL")
+	secret := testSecrets.MustGetField(t, "METAAPI")
+	inactiveSecret := testSecrets.MustGetField(t, "METAAPI_INACTIVE")
+	spell := testSecrets.MustGetField(t, "METAAPI_SPELL")
 
 	type args struct {
 		ctx    context.Context

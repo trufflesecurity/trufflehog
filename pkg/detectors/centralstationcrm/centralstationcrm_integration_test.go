@@ -23,8 +23,8 @@ func TestCentralStationCRM_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("CENTRALSTATIONCRM")
-	inactiveSecret := testSecrets.MustGetField("CENTRALSTATIONCRM_INACTIVE")
+	secret := testSecrets.MustGetField(t, "CENTRALSTATIONCRM")
+	inactiveSecret := testSecrets.MustGetField(t, "CENTRALSTATIONCRM_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

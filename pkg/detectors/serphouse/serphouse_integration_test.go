@@ -23,8 +23,8 @@ func TestSerphouse_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("SERPHOUSE")
-	inactiveSecret := testSecrets.MustGetField("SERPHOUSE_INACTIVE")
+	secret := testSecrets.MustGetField(t, "SERPHOUSE")
+	inactiveSecret := testSecrets.MustGetField(t, "SERPHOUSE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

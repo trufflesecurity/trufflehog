@@ -24,9 +24,9 @@ func TestGitHubApp_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("GITHUBAPP_PRIVATEKEY")
-	inactiveSecret := testSecrets.MustGetField("GITHUBAPP_PRIVATEKEY_INACTIVE")
-	appKey := testSecrets.MustGetField("GITHUBAPP_APPKEY")
+	secret := testSecrets.MustGetField(t, "GITHUBAPP_PRIVATEKEY")
+	inactiveSecret := testSecrets.MustGetField(t, "GITHUBAPP_PRIVATEKEY_INACTIVE")
+	appKey := testSecrets.MustGetField(t, "GITHUBAPP_APPKEY")
 
 	sDec, _ := b64.StdEncoding.DecodeString(secret)
 	inactiveSDec, _ := b64.StdEncoding.DecodeString(inactiveSecret)

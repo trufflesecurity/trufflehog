@@ -23,8 +23,8 @@ func TestPubNubSubscriptionKey_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("PUBNUBSUBSCRIPTIONKEY_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("PUBNUBSUBSCRIPTIONKEY_INACTIVE")
+	secret := testSecrets.MustGetField(t, "PUBNUBSUBSCRIPTIONKEY_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "PUBNUBSUBSCRIPTIONKEY_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

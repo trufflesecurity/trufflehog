@@ -27,9 +27,9 @@ func TestArtifactoryreferencetoken_FromChunk(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	instanceURL := testSecrets.MustGetField("ARTIFACTORY_URL")
-	secret := testSecrets.MustGetField("ARTIFACTORYREFERENCETOKEN")
-	inactiveSecret := testSecrets.MustGetField("ARTIFACTORYREFERENCETOKEN_INACTIVE")
+	instanceURL := testSecrets.MustGetField(t, "ARTIFACTORY_URL")
+	secret := testSecrets.MustGetField(t, "ARTIFACTORYREFERENCETOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "ARTIFACTORYREFERENCETOKEN_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -143,7 +143,7 @@ func TestArtifactoryreferencetoken_FromChunk(t *testing.T) {
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "primarySecret", "SecretParts")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("Artifactoryreferencetoken.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
@@ -158,8 +158,8 @@ func TestArtifactoryreferencetoken_FromChunk_WithCustomEndpoint(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	instanceURL := testSecrets.MustGetField("ARTIFACTORY_URL")
-	secret := testSecrets.MustGetField("ARTIFACTORYREFERENCETOKEN")
+	instanceURL := testSecrets.MustGetField(t, "ARTIFACTORY_URL")
+	secret := testSecrets.MustGetField(t, "ARTIFACTORYREFERENCETOKEN")
 
 	s := Scanner{}
 	s.UseFoundEndpoints(true)
@@ -189,7 +189,7 @@ func TestArtifactoryreferencetoken_FromChunk_WithCustomEndpoint(t *testing.T) {
 	}
 
 	ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "primarySecret", "SecretParts")
-	if diff := cmp.Diff(got, want, ignoreOpts); diff != "" {
+	if diff := cmp.Diff(got, want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 		t.Errorf("Artifactoryreferencetoken.FromData() diff: (-got +want)\n%s", diff)
 	}
 

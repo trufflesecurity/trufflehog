@@ -25,10 +25,10 @@ func TestSnowflake_FromChunk(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	accountIdentifier := testSecrets.MustGetField("SNOWFLAKE_ACCOUNT")
-	username := testSecrets.MustGetField("SNOWFLAKE_USERNAME")
-	password := testSecrets.MustGetField("SNOWFLAKE_PASS")
-	inactivePassword := testSecrets.MustGetField("SNOWFLAKE_PASS_INACTIVE")
+	accountIdentifier := testSecrets.MustGetField(t, "SNOWFLAKE_ACCOUNT")
+	username := testSecrets.MustGetField(t, "SNOWFLAKE_USERNAME")
+	password := testSecrets.MustGetField(t, "SNOWFLAKE_PASS")
+	inactivePassword := testSecrets.MustGetField(t, "SNOWFLAKE_PASS_INACTIVE")
 
 	// Create a context with a past deadline to simulate DeadlineExceeded error
 	pastTime := time.Now().Add(-time.Second) // Set the deadline in the past
@@ -142,7 +142,7 @@ func TestSnowflake_FromChunk(t *testing.T) {
 				got[i].ExtraData = newMap(got[i].ExtraData, keysToCopy)
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "primarySecret")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("Snowflake.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

@@ -23,8 +23,8 @@ func TestCloudImage_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("CLOUDIMAGE")
-	inactiveSecret := testSecrets.MustGetField("CLOUDIMAGE_INACTIVE")
+	secret := testSecrets.MustGetField(t, "CLOUDIMAGE")
+	inactiveSecret := testSecrets.MustGetField(t, "CLOUDIMAGE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

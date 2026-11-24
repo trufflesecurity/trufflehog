@@ -23,8 +23,8 @@ func TestOpenRouter_FromChunk(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	secret := testSecrets.MustGetField("OPENROUTER")
-	inactiveSecret := testSecrets.MustGetField("OPENROUTER_INACTIVE")
+	secret := testSecrets.MustGetField(t, "OPENROUTER")
+	inactiveSecret := testSecrets.MustGetField(t, "OPENROUTER_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

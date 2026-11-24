@@ -23,8 +23,8 @@ func TestFastForex_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("FASTFOREX")
-	inactiveSecret := testSecrets.MustGetField("FASTFOREX_INACTIVE")
+	secret := testSecrets.MustGetField(t, "FASTFOREX")
+	inactiveSecret := testSecrets.MustGetField(t, "FASTFOREX_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

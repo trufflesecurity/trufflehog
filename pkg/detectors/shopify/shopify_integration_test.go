@@ -23,9 +23,9 @@ func TestShopify_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("SHOPIFY_ADMIN_SECRET")
-	inactiveSecret := testSecrets.MustGetField("SHOPIFY_ADMIN_SECRET_INACTIVE")
-	domain := testSecrets.MustGetField("SHOPIFY_DOMAIN")
+	secret := testSecrets.MustGetField(t, "SHOPIFY_ADMIN_SECRET")
+	inactiveSecret := testSecrets.MustGetField(t, "SHOPIFY_ADMIN_SECRET_INACTIVE")
+	domain := testSecrets.MustGetField(t, "SHOPIFY_DOMAIN")
 
 	type args struct {
 		ctx    context.Context

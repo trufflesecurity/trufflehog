@@ -179,8 +179,8 @@ func TestAnalyzer_Analyze(t *testing.T) {
 		secret  string
 		wantErr bool
 	}{
-		{name: "valid xai key", secret: testSecrets.MustGetField("XAI")},
-		{name: "invalid xai key", secret: testSecrets.MustGetField("XAI_INACTIVE"), wantErr: true},
+		{name: "valid xai key", secret: testSecrets.MustGetField(t, "XAI")},
+		{name: "invalid xai key", secret: testSecrets.MustGetField(t, "XAI_INACTIVE"), wantErr: true},
 	}
 
 	for _, tt := range tests {

@@ -23,8 +23,8 @@ func TestSuperNotesAPI_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("SUPERNOTESAPI")
-	inactiveSecret := testSecrets.MustGetField("SUPERNOTESAPI_INACTIVE")
+	secret := testSecrets.MustGetField(t, "SUPERNOTESAPI")
+	inactiveSecret := testSecrets.MustGetField(t, "SUPERNOTESAPI_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

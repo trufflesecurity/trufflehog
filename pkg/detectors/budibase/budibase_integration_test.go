@@ -25,8 +25,8 @@ func TestBudibase_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("BUDIBASE")
-	inactiveSecret := testSecrets.MustGetField("BUDIBASE_INACTIVE")
+	secret := testSecrets.MustGetField(t, "BUDIBASE")
+	inactiveSecret := testSecrets.MustGetField(t, "BUDIBASE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -106,7 +106,7 @@ func TestBudibase_FromChunk(t *testing.T) {
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("Budibase.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

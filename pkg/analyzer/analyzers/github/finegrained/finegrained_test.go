@@ -29,7 +29,7 @@ func TestAnalyzer_Analyze(t *testing.T) {
 	}{
 		{
 			name:    "finegrained - github-allrepos-actionsRW-contentsRW-issuesRW",
-			key:     analyzerSecrets.MustGetField("GITHUB_FINEGRAINED_ALLREPOS_ACTIONS_RW_CONTENTS_RW_ISSUES_RW"),
+			key:     analyzerSecrets.MustGetField(t, "GITHUB_FINEGRAINED_ALLREPOS_ACTIONS_RW_CONTENTS_RW_ISSUES_RW"),
 			wantErr: false,
 		},
 	}

@@ -23,8 +23,8 @@ func TestNpmToken_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("NPMTOKEN")
-	inactiveSecret := testSecrets.MustGetField("NPMTOKEN_INACTIVE")
+	secret := testSecrets.MustGetField(t, "NPMTOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "NPMTOKEN_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

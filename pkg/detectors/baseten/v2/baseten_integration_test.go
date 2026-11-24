@@ -24,8 +24,8 @@ func TestBaseten_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("BASETEN")
-	inactiveSecret := testSecrets.MustGetField("BASETEN_INACTIVE")
+	secret := testSecrets.MustGetField(t, "BASETEN")
+	inactiveSecret := testSecrets.MustGetField(t, "BASETEN_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

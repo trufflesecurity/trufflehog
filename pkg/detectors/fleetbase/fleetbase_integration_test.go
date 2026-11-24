@@ -23,8 +23,8 @@ func TestFleetbase_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("FLEETBASE")
-	inactiveSecret := testSecrets.MustGetField("FLEETBASE_INACTIVE")
+	secret := testSecrets.MustGetField(t, "FLEETBASE")
+	inactiveSecret := testSecrets.MustGetField(t, "FLEETBASE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

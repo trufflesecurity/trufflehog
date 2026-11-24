@@ -24,10 +24,10 @@ func TestCouchbase_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	endpoint := testSecrets.MustGetField("COUCHBASE_ENDPOINT")
-	username := testSecrets.MustGetField("COUCHBASE_USERNAME")
-	password := testSecrets.MustGetField("COUCHBASE_PASSWORD")
-	inactiveSecret := testSecrets.MustGetField("COUCHBASE_INACTIVE_PASSWORD")
+	endpoint := testSecrets.MustGetField(t, "COUCHBASE_ENDPOINT")
+	username := testSecrets.MustGetField(t, "COUCHBASE_USERNAME")
+	password := testSecrets.MustGetField(t, "COUCHBASE_PASSWORD")
+	inactiveSecret := testSecrets.MustGetField(t, "COUCHBASE_INACTIVE_PASSWORD")
 
 	type args struct {
 		ctx    context.Context

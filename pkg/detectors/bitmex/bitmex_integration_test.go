@@ -23,10 +23,10 @@ func TestBitmex_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	key := testSecrets.MustGetField("BITMEX_KEY")
-	inactiveKey := testSecrets.MustGetField("BITMEX_KEY_INACTIVE")
-	secret := testSecrets.MustGetField("BITMEX")
-	inactiveSecret := testSecrets.MustGetField("BITMEX_INACTIVE")
+	key := testSecrets.MustGetField(t, "BITMEX_KEY")
+	inactiveKey := testSecrets.MustGetField(t, "BITMEX_KEY_INACTIVE")
+	secret := testSecrets.MustGetField(t, "BITMEX")
+	inactiveSecret := testSecrets.MustGetField(t, "BITMEX_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

@@ -23,8 +23,8 @@ func TestGoDaddy_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("GODADDY_OTE")
-	inactiveSecret := testSecrets.MustGetField("GODADDY_OTE_INACTIVE")
+	secret := testSecrets.MustGetField(t, "GODADDY_OTE")
+	inactiveSecret := testSecrets.MustGetField(t, "GODADDY_OTE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

@@ -23,9 +23,9 @@ func TestVerifier_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("VERIFIER")
-	user := testSecrets.MustGetField("ACCOUNT_USER")
-	inactiveSecret := testSecrets.MustGetField("VERIFIER_INACTIVE")
+	secret := testSecrets.MustGetField(t, "VERIFIER")
+	user := testSecrets.MustGetField(t, "ACCOUNT_USER")
+	inactiveSecret := testSecrets.MustGetField(t, "VERIFIER_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

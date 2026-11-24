@@ -3,6 +3,20 @@
 
 package docker
 
+import (
+	"context"
+	"fmt"
+	"testing"
+	"time"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
+)
+
 func TestDocker_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
@@ -10,8 +24,8 @@ func TestDocker_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("DOCKER")
-	inactiveSecret := testSecrets.MustGetField("DOCKER_INACTIVE")
+	secret := testSecrets.MustGetField(t, "DOCKER")
+	inactiveSecret := testSecrets.MustGetField(t, "DOCKER_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -123,7 +137,7 @@ func TestDocker_FromChunk(t *testing.T) {
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("Docker.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

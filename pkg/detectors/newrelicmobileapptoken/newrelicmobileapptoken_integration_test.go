@@ -24,8 +24,8 @@ func TestNewRelicMobileAppToken_FromChunk(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	key := testSecrets.MustGetField("NEW_RELIC_MOBILE_APP_TOKEN")
-	keyEU := testSecrets.MustGetField("NEW_RELIC_MOBILE_APP_TOKEN_EU")
+	key := testSecrets.MustGetField(t, "NEW_RELIC_MOBILE_APP_TOKEN")
+	keyEU := testSecrets.MustGetField(t, "NEW_RELIC_MOBILE_APP_TOKEN_EU")
 	keyInactive := "AAcc7eb96551e8cd65818865695f35bb109455d623-NRMA"
 
 	type args struct {

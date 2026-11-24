@@ -23,8 +23,8 @@ func TestUnifyid_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("UNIFY")
-	inactiveSecret := testSecrets.MustGetField("UNIFY_INACTIVE")
+	secret := testSecrets.MustGetField(t, "UNIFY")
+	inactiveSecret := testSecrets.MustGetField(t, "UNIFY_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

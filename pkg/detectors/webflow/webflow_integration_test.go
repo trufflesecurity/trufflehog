@@ -23,8 +23,8 @@ func TestWebflow_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("WEBFLOW_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("WEBFLOW_INACTIVE")
+	secret := testSecrets.MustGetField(t, "WEBFLOW_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "WEBFLOW_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

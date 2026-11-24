@@ -23,10 +23,10 @@ func TestMailgun_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("MAILGUN_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("MAILGUN_INACTIVE")
-	keyDashSecret := testSecrets.MustGetField("NEW_MAILGUN_TOKEN_ACTIVE")
-	inactiveHexEncodedSecret := testSecrets.MustGetField("NEW_MAILGUN_TOKEN_INACTIVE")
+	secret := testSecrets.MustGetField(t, "MAILGUN_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "MAILGUN_INACTIVE")
+	keyDashSecret := testSecrets.MustGetField(t, "NEW_MAILGUN_TOKEN_ACTIVE")
+	inactiveHexEncodedSecret := testSecrets.MustGetField(t, "NEW_MAILGUN_TOKEN_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

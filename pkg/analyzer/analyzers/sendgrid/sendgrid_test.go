@@ -33,7 +33,7 @@ func TestAnalyzer_Analyze(t *testing.T) {
 	}{
 		{
 			name:    "Valid Sendgrid key",
-			key:     testSecrets.MustGetField("SENDGRID"),
+			key:     testSecrets.MustGetField(t, "SENDGRID"),
 			want:    expectedOutput,
 			wantErr: false,
 		},

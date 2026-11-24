@@ -25,9 +25,9 @@ func TestPubNubPublishKey_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	pub := testSecrets.MustGetField("PUBNUBPUBLISHKEY_TOKEN")
-	inactivePub := testSecrets.MustGetField("PUBNUBPUBLISHKEY_INACTIVE")
-	sub := testSecrets.MustGetField("PUBNUBSUBSCRIPTIONKEY_TOKEN")
+	pub := testSecrets.MustGetField(t, "PUBNUBPUBLISHKEY_TOKEN")
+	inactivePub := testSecrets.MustGetField(t, "PUBNUBPUBLISHKEY_INACTIVE")
+	sub := testSecrets.MustGetField(t, "PUBNUBSUBSCRIPTIONKEY_TOKEN")
 
 	type args struct {
 		ctx    context.Context
@@ -136,7 +136,7 @@ func TestPubNubPublishKey_FromChunk(t *testing.T) {
 				}
 			}
 			opts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError")
-			if diff := cmp.Diff(got, tt.want, opts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, opts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("PubNubPublishKey.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

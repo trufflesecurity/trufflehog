@@ -23,9 +23,9 @@ func TestClarifai_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	apiKey := testSecrets.MustGetField("CLARIFAI_API_KEY")
-	inactiveApiKey := testSecrets.MustGetField("CLARIFAI_API_KEY_INACTIVE")
-	pat := testSecrets.MustGetField("CLARIFAI_PAT")
+	apiKey := testSecrets.MustGetField(t, "CLARIFAI_API_KEY")
+	inactiveApiKey := testSecrets.MustGetField(t, "CLARIFAI_API_KEY_INACTIVE")
+	pat := testSecrets.MustGetField(t, "CLARIFAI_PAT")
 
 	type args struct {
 		ctx    context.Context

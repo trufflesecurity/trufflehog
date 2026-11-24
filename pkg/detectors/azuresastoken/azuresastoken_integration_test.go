@@ -25,9 +25,9 @@ func TestAzureSasToken_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	url := testSecrets.MustGetField("AZURESASTOKEN_URL")
-	secret := testSecrets.MustGetField("AZURESASTOKEN")
-	inactiveSecret := testSecrets.MustGetField("AZURESASTOKEN_INACTIVE")
+	url := testSecrets.MustGetField(t, "AZURESASTOKEN_URL")
+	secret := testSecrets.MustGetField(t, "AZURESASTOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "AZURESASTOKEN_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -105,7 +105,7 @@ func TestAzureSasToken_FromChunk(t *testing.T) {
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "Redacted", "verificationError")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("AzureSasToken.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

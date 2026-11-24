@@ -23,8 +23,8 @@ func TestKnapsackPro_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("KNAPSACKPRO")
-	inactiveSecret := testSecrets.MustGetField("KNAPSACKPRO_INACTIVE")
+	secret := testSecrets.MustGetField(t, "KNAPSACKPRO")
+	inactiveSecret := testSecrets.MustGetField(t, "KNAPSACKPRO_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

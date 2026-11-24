@@ -82,7 +82,7 @@ func TestSqlServer(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
 			ctx := logContext.AddLogger(context.Background())
-			j, err := ParseSqlServer(ctx, tt.input)
+			j, err := parseSqlServer(ctx, tt.input)
 
 			if err != nil {
 				got := result{parseErr: true}

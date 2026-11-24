@@ -23,8 +23,8 @@ func TestFxmarket_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("FXMARKET")
-	inactiveSecret := testSecrets.MustGetField("FXMARKET_INACTIVE")
+	secret := testSecrets.MustGetField(t, "FXMARKET")
+	inactiveSecret := testSecrets.MustGetField(t, "FXMARKET_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

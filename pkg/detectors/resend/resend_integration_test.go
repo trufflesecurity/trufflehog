@@ -24,9 +24,9 @@ func TestResend_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("RESEND_API_KEY")
-	sendingAccessSecret := testSecrets.MustGetField("RESEND_API_KEY_SENDING_ACCESS")
-	inactiveSecret := testSecrets.MustGetField("RESEND_API_KEY_INACTIVE")
+	secret := testSecrets.MustGetField(t, "RESEND_API_KEY")
+	sendingAccessSecret := testSecrets.MustGetField(t, "RESEND_API_KEY_SENDING_ACCESS")
+	inactiveSecret := testSecrets.MustGetField(t, "RESEND_API_KEY_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

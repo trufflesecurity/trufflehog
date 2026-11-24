@@ -24,8 +24,8 @@ func TestTailscaleapi_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("TAILSCALEAPI")
-	inactiveSecret := testSecrets.MustGetField("TAILSCALEAPI_INACTIVE")
+	secret := testSecrets.MustGetField(t, "TAILSCALEAPI")
+	inactiveSecret := testSecrets.MustGetField(t, "TAILSCALEAPI_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

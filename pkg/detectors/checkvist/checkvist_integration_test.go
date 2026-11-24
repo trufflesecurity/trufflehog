@@ -23,9 +23,9 @@ func TestCheckvist_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	user := testSecrets.MustGetField("CHECKVIST_EMAIL")
-	secret := testSecrets.MustGetField("CHECKVIST")
-	inactiveSecret := testSecrets.MustGetField("CHECKVIST_INACTIVE")
+	user := testSecrets.MustGetField(t, "CHECKVIST_EMAIL")
+	secret := testSecrets.MustGetField(t, "CHECKVIST")
+	inactiveSecret := testSecrets.MustGetField(t, "CHECKVIST_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

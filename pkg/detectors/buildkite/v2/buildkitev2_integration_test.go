@@ -23,8 +23,8 @@ func TestBuildkite_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("BUILDKITEV2_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("BUILDKITEV2_INACTIVE")
+	secret := testSecrets.MustGetField(t, "BUILDKITEV2_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "BUILDKITEV2_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

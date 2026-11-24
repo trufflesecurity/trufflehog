@@ -24,10 +24,10 @@ func TestEndorlabs_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	key := testSecrets.MustGetField("ENDOR_KEY")
-	secret := testSecrets.MustGetField("ENDOR_SECRET")
-	inactiveKey := testSecrets.MustGetField("ENDOR_KEY_INACTIVE")
-	inactiveSecret := testSecrets.MustGetField("ENDOR_SECRET_INACTIVE")
+	key := testSecrets.MustGetField(t, "ENDOR_KEY")
+	secret := testSecrets.MustGetField(t, "ENDOR_SECRET")
+	inactiveKey := testSecrets.MustGetField(t, "ENDOR_KEY_INACTIVE")
+	inactiveSecret := testSecrets.MustGetField(t, "ENDOR_SECRET_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -158,7 +158,7 @@ func TestEndorlabs_FromChunk(t *testing.T) {
 			sortOpts := cmpopts.SortSlices(func(a, b []detectors.Result) bool {
 				return string(a[0].Raw) < string(b[0].Raw)
 			})
-			if diff := cmp.Diff(got, tt.want, ignoreOpts, sortOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, sortOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("Endorlabs.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

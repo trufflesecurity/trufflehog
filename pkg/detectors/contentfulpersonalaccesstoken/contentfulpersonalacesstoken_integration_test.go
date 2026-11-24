@@ -23,8 +23,8 @@ func TestContentfulPersonalAccessToken_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("CONTENTFULPERSONALACCESSTOKEN")
-	inactiveSecret := testSecrets.MustGetField("CONTENTFULPERSONALACCESSTOKEN_INACTIVE")
+	secret := testSecrets.MustGetField(t, "CONTENTFULPERSONALACCESSTOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "CONTENTFULPERSONALACCESSTOKEN_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

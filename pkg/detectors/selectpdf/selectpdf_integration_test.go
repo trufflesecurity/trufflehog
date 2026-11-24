@@ -23,8 +23,8 @@ func TestSelectPDF_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("SELECTPDF")
-	inactiveSecret := testSecrets.MustGetField("SELECTPDF_INACTIVE")
+	secret := testSecrets.MustGetField(t, "SELECTPDF")
+	inactiveSecret := testSecrets.MustGetField(t, "SELECTPDF_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

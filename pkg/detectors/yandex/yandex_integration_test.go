@@ -23,8 +23,8 @@ func TestYandex_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("YANDEX")
-	inactiveSecret := testSecrets.MustGetField("YANDEX_INACTIVE")
+	secret := testSecrets.MustGetField(t, "YANDEX")
+	inactiveSecret := testSecrets.MustGetField(t, "YANDEX_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

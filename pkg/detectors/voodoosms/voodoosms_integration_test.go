@@ -23,8 +23,8 @@ func TestVoodooSMS_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("VOODOOSMS")
-	inactiveSecret := testSecrets.MustGetField("VOODOOSMS_INACTIVE")
+	secret := testSecrets.MustGetField(t, "VOODOOSMS")
+	inactiveSecret := testSecrets.MustGetField(t, "VOODOOSMS_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

@@ -23,8 +23,8 @@ func TestWrike_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("WRIKE_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("WRIKE_INACTIVE")
+	secret := testSecrets.MustGetField(t, "WRIKE_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "WRIKE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

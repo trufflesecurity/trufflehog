@@ -23,9 +23,9 @@ func TestNethunt_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("NETHUNT_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("NETHUNT_INACTIVE")
-	user := testSecrets.MustGetField("ACCOUNT_USER")
+	secret := testSecrets.MustGetField(t, "NETHUNT_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "NETHUNT_INACTIVE")
+	user := testSecrets.MustGetField(t, "ACCOUNT_USER")
 
 	type args struct {
 		ctx    context.Context

@@ -23,8 +23,8 @@ func TestImpala_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("IMPALA")
-	inactiveSecret := testSecrets.MustGetField("IMPALA_INACTIVE")
+	secret := testSecrets.MustGetField(t, "IMPALA")
+	inactiveSecret := testSecrets.MustGetField(t, "IMPALA_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

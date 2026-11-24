@@ -23,8 +23,8 @@ func TestGyazo_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("GYAZO")
-	inactiveSecret := testSecrets.MustGetField("GYAZO_INACTIVE")
+	secret := testSecrets.MustGetField(t, "GYAZO")
+	inactiveSecret := testSecrets.MustGetField(t, "GYAZO_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

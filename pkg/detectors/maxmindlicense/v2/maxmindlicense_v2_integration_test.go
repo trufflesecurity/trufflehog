@@ -23,8 +23,8 @@ func TestMaxMindLicense(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("MAXMIND_LICENSE_V2")
-	inactiveSecret := testSecrets.MustGetField("MAXMIND_LICENSE_INACTIVE_V2")
+	secret := testSecrets.MustGetField(t, "MAXMIND_LICENSE_V2")
+	inactiveSecret := testSecrets.MustGetField(t, "MAXMIND_LICENSE_INACTIVE_V2")
 
 	type args struct {
 		ctx    context.Context

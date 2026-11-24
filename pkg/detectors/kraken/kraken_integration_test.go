@@ -23,10 +23,10 @@ func TestKraken_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("KRAKEN")
-	inactiveSecret := testSecrets.MustGetField("KRAKEN_INACTIVE")
-	private := testSecrets.MustGetField("KRAKEN_PRIVATE")
-	inactivePrivate := testSecrets.MustGetField("KRAKEN_PRIVATE_INACTIVE")
+	secret := testSecrets.MustGetField(t, "KRAKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "KRAKEN_INACTIVE")
+	private := testSecrets.MustGetField(t, "KRAKEN_PRIVATE")
+	inactivePrivate := testSecrets.MustGetField(t, "KRAKEN_PRIVATE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

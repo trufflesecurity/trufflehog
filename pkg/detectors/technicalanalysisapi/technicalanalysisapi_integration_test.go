@@ -23,8 +23,8 @@ func TestTechnicalAnalysisApi_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("TECHNICALANALYSISAPI")
-	inactiveSecret := testSecrets.MustGetField("TECHNICALANALYSISAPI_INACTIVE")
+	secret := testSecrets.MustGetField(t, "TECHNICALANALYSISAPI")
+	inactiveSecret := testSecrets.MustGetField(t, "TECHNICALANALYSISAPI_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

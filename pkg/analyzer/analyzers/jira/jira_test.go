@@ -24,9 +24,9 @@ func TestAnalyzer_Analyze(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	jiraDomain := testSecrets.MustGetField("JIRA_DOMAIN_ANALYZE")
-	jiraEmail := testSecrets.MustGetField("JIRA_EMAIL_ANALYZE")
-	jiraToken := testSecrets.MustGetField("JIRA_TOKEN_ANALYZE")
+	jiraDomain := testSecrets.MustGetField(t, "JIRA_DOMAIN_ANALYZE")
+	jiraEmail := testSecrets.MustGetField(t, "JIRA_EMAIL_ANALYZE")
+	jiraToken := testSecrets.MustGetField(t, "JIRA_TOKEN_ANALYZE")
 
 	tests := []struct {
 		name    string

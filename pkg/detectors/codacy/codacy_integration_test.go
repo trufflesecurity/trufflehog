@@ -23,8 +23,8 @@ func TestCodacy_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("CODACY")
-	inactiveSecret := testSecrets.MustGetField("CODACY_INACTIVE")
+	secret := testSecrets.MustGetField(t, "CODACY")
+	inactiveSecret := testSecrets.MustGetField(t, "CODACY_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

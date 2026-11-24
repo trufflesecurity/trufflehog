@@ -23,9 +23,9 @@ func TestSalesmate_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("SALESMATE")
-	inactiveSecret := testSecrets.MustGetField("SALESMATE_INACTIVE")
-	domain := testSecrets.MustGetField("SALESMATE_DOMAIN")
+	secret := testSecrets.MustGetField(t, "SALESMATE")
+	inactiveSecret := testSecrets.MustGetField(t, "SALESMATE_INACTIVE")
+	domain := testSecrets.MustGetField(t, "SALESMATE_DOMAIN")
 
 	type args struct {
 		ctx    context.Context

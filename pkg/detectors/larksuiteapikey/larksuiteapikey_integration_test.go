@@ -22,9 +22,9 @@ func TestLarksuiteApiKey_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	id := testSecrets.MustGetField("LARKSUITE_APP_ID")
-	secret := testSecrets.MustGetField("LARKSUITE_APP_SECRET")
-	inactiveSecret := testSecrets.MustGetField("LARKSUITE_APP_SECRET_INACTIVE")
+	id := testSecrets.MustGetField(t, "LARKSUITE_APP_ID")
+	secret := testSecrets.MustGetField(t, "LARKSUITE_APP_SECRET")
+	inactiveSecret := testSecrets.MustGetField(t, "LARKSUITE_APP_SECRET_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

@@ -24,15 +24,15 @@ func TestSalesforce_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	instance := testSecrets.MustGetField("SALESFORCE_INSTANCE")
+	instance := testSecrets.MustGetField(t, "SALESFORCE_INSTANCE")
 	// Salesforce secrets are not valid for long, so we may need to regenerate them.
 	// Steps to regenerate:
 	// 1. Install Salesforce CLI
 	// 2. Authenticate with `sfdx org web login`. This will open a browser window. Use the credentials in the detection test accounts 1Pass vault.
 	// 3. Run `sfdx org display --targetusername zubairkhan@trufflesec.com`to obtain new token.
 	// Source: https://developer.salesforce.com/docs/atlas.en-us.api_rest.meta/api_rest/quickstart_oauth.htm
-	token := testSecrets.MustGetField("SALESFORCE_TOKEN")
-	inactiveToken := testSecrets.MustGetField("SALESFORCE_INACTIVE_TOKEN")
+	token := testSecrets.MustGetField(t, "SALESFORCE_TOKEN")
+	inactiveToken := testSecrets.MustGetField(t, "SALESFORCE_INACTIVE_TOKEN")
 
 	type args struct {
 		ctx    context.Context
@@ -144,7 +144,7 @@ func TestSalesforce_FromChunk(t *testing.T) {
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("Salesforce.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

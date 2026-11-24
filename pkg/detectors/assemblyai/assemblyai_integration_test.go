@@ -23,8 +23,8 @@ func TestAssemblyai_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("ASSEMBLYAI")
-	inactiveSecret := testSecrets.MustGetField("ASSEMBLYAI_INACTIVE")
+	secret := testSecrets.MustGetField(t, "ASSEMBLYAI")
+	inactiveSecret := testSecrets.MustGetField(t, "ASSEMBLYAI_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

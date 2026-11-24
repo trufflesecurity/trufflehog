@@ -23,9 +23,9 @@ func TestCloudflareApiToken_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("CLOUDFLARE_API_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("CLOUDFLARE_API_INACTIVE")
-	secret2 := testSecrets.MustGetField("CLOUDFLARE_API_TOKEN2")
+	secret := testSecrets.MustGetField(t, "CLOUDFLARE_API_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "CLOUDFLARE_API_INACTIVE")
+	secret2 := testSecrets.MustGetField(t, "CLOUDFLARE_API_TOKEN2")
 
 	type args struct {
 		ctx    context.Context

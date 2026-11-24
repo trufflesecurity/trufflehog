@@ -23,8 +23,8 @@ func TestProtocolsIO_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("PROTOCOLSIO")
-	inactiveSecret := testSecrets.MustGetField("PROTOCOLSIO_INACTIVE")
+	secret := testSecrets.MustGetField(t, "PROTOCOLSIO")
+	inactiveSecret := testSecrets.MustGetField(t, "PROTOCOLSIO_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

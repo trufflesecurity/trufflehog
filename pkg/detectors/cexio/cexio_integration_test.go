@@ -23,11 +23,11 @@ func TestCexIO_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	userId := testSecrets.MustGetField("CEXIO_USERID")
-	key := testSecrets.MustGetField("CEXIO_KEY")
-	inactiveKey := testSecrets.MustGetField("CEXIO_KEY_INACTIVE")
-	secret := testSecrets.MustGetField("CEXIO")
-	inactiveSecret := testSecrets.MustGetField("CEXIO_INACTIVE")
+	userId := testSecrets.MustGetField(t, "CEXIO_USERID")
+	key := testSecrets.MustGetField(t, "CEXIO_KEY")
+	inactiveKey := testSecrets.MustGetField(t, "CEXIO_KEY_INACTIVE")
+	secret := testSecrets.MustGetField(t, "CEXIO")
+	inactiveSecret := testSecrets.MustGetField(t, "CEXIO_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

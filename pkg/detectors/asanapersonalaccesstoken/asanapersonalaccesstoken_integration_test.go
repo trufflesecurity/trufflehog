@@ -28,10 +28,10 @@ func TestAsanaPersonalAccessToken_FromChunk(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	oldFormatSecret := testSecrets.MustGetField("ASANA_PAT")
-	newFormatSecret := testNewSecrets.MustGetField("ASANA_PAT_NEW")
-	inactiveOldFormatSecret := testSecrets.MustGetField("ASANA_PAT_INACTIVE")
-	inactiveNewFormatSecret := testNewSecrets.MustGetField("ASANA_PAT_NEW_INACTIVE")
+	oldFormatSecret := testSecrets.MustGetField(t, "ASANA_PAT")
+	newFormatSecret := testNewSecrets.MustGetField(t, "ASANA_PAT_NEW")
+	inactiveOldFormatSecret := testSecrets.MustGetField(t, "ASANA_PAT_INACTIVE")
+	inactiveNewFormatSecret := testNewSecrets.MustGetField(t, "ASANA_PAT_NEW_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -66,7 +66,7 @@ func TestAsanaPersonalAccessToken_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a asana secret %s within but unverified", inactiveSecret)),
+				data:   []byte(fmt.Sprintf("You can find a asana secret %s within but unverified", inactiveOldFormatSecret)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -109,7 +109,7 @@ func TestAsanaPersonalAccessToken_FromChunk(t *testing.T) {
 			},
 			wantErr: false,
 		},
-				{
+		{
 			name: "not found",
 			s:    Scanner{},
 			args: args{
@@ -120,25 +120,26 @@ func TestAsanaPersonalAccessToken_FromChunk(t *testing.T) {
 			want:    nil,
 			wantErr: false,
 		},
-		for _, tt := range tests {
-			t.Run(tt.name, func(t *testing.T) {
-				s := Scanner{}
-				got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
-				if (err != nil) != tt.wantErr {
-					t.Errorf("AsanaPersonalAccessToken.FromData() error = %v, wantErr %v", err, tt.wantErr)
-					return
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := Scanner{}
+			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("AsanaPersonalAccessToken.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			for i := range got {
+				if len(got[i].Raw) == 0 {
+					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
-				for i := range got {
-					if len(got[i].Raw) == 0 {
-						t.Fatalf("no raw secret present: \n %+v", got[i])
-					}
-					got[i].Raw = nil
-				}
-				if diff := pretty.Compare(got, tt.want); diff != "" {
-					t.Errorf("AsanaPersonalAccessToken.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
-				}
-			})
-		}
+				got[i].Raw = nil
+			}
+			if diff := pretty.Compare(got, tt.want); diff != "" {
+				t.Errorf("AsanaPersonalAccessToken.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+			}
+		})
 	}
 }
 

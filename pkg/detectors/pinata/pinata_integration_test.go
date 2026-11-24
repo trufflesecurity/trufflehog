@@ -23,9 +23,9 @@ func TestPinata_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("PINATA")
-	key := testSecrets.MustGetField("PINATA_KEY")
-	inactiveSecret := testSecrets.MustGetField("PINATA_INACTIVE")
+	secret := testSecrets.MustGetField(t, "PINATA")
+	key := testSecrets.MustGetField(t, "PINATA_KEY")
+	inactiveSecret := testSecrets.MustGetField(t, "PINATA_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

@@ -23,8 +23,8 @@ func TestDyspatch_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("DYSPATCH_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("DYSPATCH_INACTIVE")
+	secret := testSecrets.MustGetField(t, "DYSPATCH_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "DYSPATCH_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

@@ -23,8 +23,8 @@ func TestUrlscan_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("URLSCAN")
-	inactiveSecret := testSecrets.MustGetField("URLSCAN_INACTIVE")
+	secret := testSecrets.MustGetField(t, "URLSCAN")
+	inactiveSecret := testSecrets.MustGetField(t, "URLSCAN_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

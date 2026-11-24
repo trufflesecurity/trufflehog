@@ -23,8 +23,8 @@ func TestAutoklose_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("AUTOKLOSE")
-	inactiveSecret := testSecrets.MustGetField("AUTOKLOSE_INACTIVE")
+	secret := testSecrets.MustGetField(t, "AUTOKLOSE")
+	inactiveSecret := testSecrets.MustGetField(t, "AUTOKLOSE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

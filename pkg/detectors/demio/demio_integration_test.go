@@ -23,9 +23,9 @@ func TestDemio_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("DEMIO")
-	inactiveSecret := testSecrets.MustGetField("DEMIO_INACTIVE")
-	keySecret := testSecrets.MustGetField("DEMIO_SECRET")
+	secret := testSecrets.MustGetField(t, "DEMIO")
+	inactiveSecret := testSecrets.MustGetField(t, "DEMIO_INACTIVE")
+	keySecret := testSecrets.MustGetField(t, "DEMIO_SECRET")
 
 	type args struct {
 		ctx    context.Context

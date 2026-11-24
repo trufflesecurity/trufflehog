@@ -24,8 +24,8 @@ func TestDigitalOceanV2_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("DIGITALOCEANV2")
-	inactiveSecret := testSecrets.MustGetField("DIGITALOCEANV2_INACTIVE")
+	secret := testSecrets.MustGetField(t, "DIGITALOCEANV2")
+	inactiveSecret := testSecrets.MustGetField(t, "DIGITALOCEANV2_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -117,7 +117,7 @@ func TestDigitalOceanV2_FromChunk(t *testing.T) {
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "SecretParts")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("DigitalOceanV2.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

@@ -30,7 +30,7 @@ func TestGitLab(t *testing.T) {
 		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
 	}
 	_, err = e.ScanGitLab(ctx, sources.GitlabConfig{
-		Token: secret.MustGetField("GITLAB_TOKEN"),
+		Token: secret.MustGetField(t, "GITLAB_TOKEN"),
 	})
 	assert.NoError(t, err)
 

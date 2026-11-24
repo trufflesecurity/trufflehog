@@ -23,8 +23,8 @@ func TestZipCodeAPI_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("ZIPCODEAPI")
-	inactiveSecret := testSecrets.MustGetField("ZIPCODEAPI_INACTIVE")
+	secret := testSecrets.MustGetField(t, "ZIPCODEAPI")
+	inactiveSecret := testSecrets.MustGetField(t, "ZIPCODEAPI_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

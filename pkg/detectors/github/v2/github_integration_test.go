@@ -23,13 +23,13 @@ func TestGitHub_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	unverifiedGhp := testSecrets.MustGetField("GITHUB_UNVERIFIED_GHP")
-	unverifiedGhpLong := testSecrets.MustGetField("GITHUB_UNVERIFIED_GHP_LONG")
-	unverifiedGho := testSecrets.MustGetField("GITHUB_UNVERIFIED_GHO")
-	unverifiedGhu := testSecrets.MustGetField("GITHUB_UNVERIFIED_GHU")
-	unverifiedGhs := testSecrets.MustGetField("GITHUB_UNVERIFIED_GHS")
-	unverifiedGhr := testSecrets.MustGetField("GITHUB_UNVERIFIED_GHR")
-	verifiedGhp := testSecrets.MustGetField("GITHUB_VERIFIED_GHP")
+	unverifiedGhp := testSecrets.MustGetField(t, "GITHUB_UNVERIFIED_GHP")
+	unverifiedGhpLong := testSecrets.MustGetField(t, "GITHUB_UNVERIFIED_GHP_LONG")
+	unverifiedGho := testSecrets.MustGetField(t, "GITHUB_UNVERIFIED_GHO")
+	unverifiedGhu := testSecrets.MustGetField(t, "GITHUB_UNVERIFIED_GHU")
+	unverifiedGhs := testSecrets.MustGetField(t, "GITHUB_UNVERIFIED_GHS")
+	unverifiedGhr := testSecrets.MustGetField(t, "GITHUB_UNVERIFIED_GHR")
+	verifiedGhp := testSecrets.MustGetField(t, "GITHUB_VERIFIED_GHP")
 
 	type args struct {
 		ctx    context.Context

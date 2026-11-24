@@ -23,8 +23,8 @@ func TestAppointedd_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("APPOINTEDD")
-	inactiveSecret := testSecrets.MustGetField("APPOINTEDD_INACTIVE")
+	secret := testSecrets.MustGetField(t, "APPOINTEDD")
+	inactiveSecret := testSecrets.MustGetField(t, "APPOINTEDD_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

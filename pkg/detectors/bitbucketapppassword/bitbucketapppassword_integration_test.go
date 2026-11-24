@@ -24,8 +24,8 @@ func TestBitbucketAppPassword_FromData_Integration(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	username := testSecrets.MustGetField("USERNAME")
-	validPassword := testSecrets.MustGetField("BITBUCKETAPPPASSWORD")
+	username := testSecrets.MustGetField(t, "USERNAME")
+	validPassword := testSecrets.MustGetField(t, "BITBUCKETAPPPASSWORD")
 	invalidPassword := "ATBB123abcDEF456ghiJKL789mnoPQR" // An invalid but correctly formatted password
 
 	tests := []struct {

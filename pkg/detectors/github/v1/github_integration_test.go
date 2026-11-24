@@ -24,8 +24,8 @@ func TestGitHub_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("GITHUB_OLD")
-	secretInactive := testSecrets.MustGetField("GITHUB_OLD_INACTIVE")
+	secret := testSecrets.MustGetField(t, "GITHUB_OLD")
+	secretInactive := testSecrets.MustGetField(t, "GITHUB_OLD_INACTIVE")
 	type args struct {
 		ctx    context.Context
 		data   []byte

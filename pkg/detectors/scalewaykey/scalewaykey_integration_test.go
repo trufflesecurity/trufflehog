@@ -23,8 +23,8 @@ func TestScalewayKey_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("SCALEWAYKEY_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("SCALEWAYKEY_INACTIVE")
+	secret := testSecrets.MustGetField(t, "SCALEWAYKEY_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "SCALEWAYKEY_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

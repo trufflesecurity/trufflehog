@@ -23,8 +23,8 @@ func TestPdfLayer_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("PDFLAYER")
-	inactiveSecret := testSecrets.MustGetField("PDFLAYER_INACTIVE")
+	secret := testSecrets.MustGetField(t, "PDFLAYER")
+	inactiveSecret := testSecrets.MustGetField(t, "PDFLAYER_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

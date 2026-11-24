@@ -24,9 +24,9 @@ func TestDatadogToken_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	apiKey := testSecrets.MustGetField("DATADOGTOKEN_TOKEN")
-	appKey := testSecrets.MustGetField("DATADOGTOKEN_APPKEY")
-	inactiveAppKey := testSecrets.MustGetField("DATADOGTOKEN_INACTIVE")
+	apiKey := testSecrets.MustGetField(t, "DATADOGTOKEN_TOKEN")
+	appKey := testSecrets.MustGetField(t, "DATADOGTOKEN_APPKEY")
+	inactiveAppKey := testSecrets.MustGetField(t, "DATADOGTOKEN_INACTIVE")
 	endpoint := "https://api.us5.datadoghq.com"
 
 	type args struct {
@@ -127,11 +127,8 @@ func TestDatadogToken_FromChunk(t *testing.T) {
 				detectors.Result{},
 				"ExtraData",
 				"verificationError",
-				"primarySecret",
-				"chunkOffset",
-				"chunkOffsetSet",
 			)
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("DatadogToken.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
@@ -147,8 +144,8 @@ func TestDatadogToken_FromChunk_Unverified(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	apiKey := testSecrets.MustGetField("DATADOGTOKEN_TOKEN")
-	inactiveAppKey := testSecrets.MustGetField("DATADOGTOKEN_INACTIVE")
+	apiKey := testSecrets.MustGetField(t, "DATADOGTOKEN_TOKEN")
+	inactiveAppKey := testSecrets.MustGetField(t, "DATADOGTOKEN_INACTIVE")
 
 	data := []byte(fmt.Sprintf(
 		"You can find a datadogtoken secret %s within but datadog %s not valid",

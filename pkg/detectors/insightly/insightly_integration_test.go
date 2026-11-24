@@ -23,8 +23,8 @@ func TestInsightly_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("INSIGHTLY")
-	inactiveSecret := testSecrets.MustGetField("INSIGHTLY_INACTIVE")
+	secret := testSecrets.MustGetField(t, "INSIGHTLY")
+	inactiveSecret := testSecrets.MustGetField(t, "INSIGHTLY_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

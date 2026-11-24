@@ -23,8 +23,8 @@ func TestKarmaCRM_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("KARMACRM")
-	inactiveSecret := testSecrets.MustGetField("KARMACRM_INACTIVE")
+	secret := testSecrets.MustGetField(t, "KARMACRM")
+	inactiveSecret := testSecrets.MustGetField(t, "KARMACRM_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

@@ -23,9 +23,9 @@ func TestThousandEyes_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("THOUSANDEYES")
-	email := testSecrets.MustGetField("THOUSANDEYES_USER")
-	inactiveSecret := testSecrets.MustGetField("THOUSANDEYES_INACTIVE")
+	secret := testSecrets.MustGetField(t, "THOUSANDEYES")
+	email := testSecrets.MustGetField(t, "THOUSANDEYES_USER")
+	inactiveSecret := testSecrets.MustGetField(t, "THOUSANDEYES_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

@@ -23,8 +23,8 @@ func TestPureStake_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("PURESTAKE")
-	inactiveSecret := testSecrets.MustGetField("PURESTAKE_INACTIVE")
+	secret := testSecrets.MustGetField(t, "PURESTAKE")
+	inactiveSecret := testSecrets.MustGetField(t, "PURESTAKE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

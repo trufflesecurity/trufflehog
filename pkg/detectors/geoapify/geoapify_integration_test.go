@@ -23,8 +23,8 @@ func TestGeoapify_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("GEOAPIFY")
-	inactiveSecret := testSecrets.MustGetField("GEOAPIFY_INACTIVE")
+	secret := testSecrets.MustGetField(t, "GEOAPIFY")
+	inactiveSecret := testSecrets.MustGetField(t, "GEOAPIFY_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

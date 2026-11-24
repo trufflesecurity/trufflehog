@@ -27,7 +27,7 @@ func TestAnalyzer_Analyze(t *testing.T) {
 	}{
 		{
 			name: "valid Huggingface key",
-			key:  testSecrets.MustGetField("HUGGINGFACE"),
+			key:  testSecrets.MustGetField(t, "HUGGINGFACE"),
 			want: `{
 				"AnalyzerType":6,
 				"Bindings":[

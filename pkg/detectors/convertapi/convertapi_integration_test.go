@@ -23,8 +23,8 @@ func TestConvertApi_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("CONVERTAPI")
-	inactiveSecret := testSecrets.MustGetField("CONVERTAPI_INACTIVE")
+	secret := testSecrets.MustGetField(t, "CONVERTAPI")
+	inactiveSecret := testSecrets.MustGetField(t, "CONVERTAPI_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

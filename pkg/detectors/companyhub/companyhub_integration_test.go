@@ -23,9 +23,9 @@ func TestCompanyHub_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("COMPANYHUB_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("COMPANYHUB_INACTIVE")
-	user := testSecrets.MustGetField("COMPANYHUB_USER")
+	secret := testSecrets.MustGetField(t, "COMPANYHUB_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "COMPANYHUB_INACTIVE")
+	user := testSecrets.MustGetField(t, "COMPANYHUB_USER")
 
 	type args struct {
 		ctx    context.Context

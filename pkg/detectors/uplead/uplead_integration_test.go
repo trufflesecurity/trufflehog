@@ -23,8 +23,8 @@ func TestUplead_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("UPLEAD")
-	inactiveSecret := testSecrets.MustGetField("UPLEAD_INACTIVE")
+	secret := testSecrets.MustGetField(t, "UPLEAD")
+	inactiveSecret := testSecrets.MustGetField(t, "UPLEAD_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

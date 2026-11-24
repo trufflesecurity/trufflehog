@@ -23,8 +23,8 @@ func TestShotstack_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("SHOTSTACK")
-	inactiveSecret := testSecrets.MustGetField("SHOTSTACK_INACTIVE")
+	secret := testSecrets.MustGetField(t, "SHOTSTACK")
+	inactiveSecret := testSecrets.MustGetField(t, "SHOTSTACK_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

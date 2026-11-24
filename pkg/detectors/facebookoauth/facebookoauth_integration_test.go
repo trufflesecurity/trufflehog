@@ -23,9 +23,9 @@ func TestFacebookOAuth_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	appId := testSecrets.MustGetField("FACEBOOK_APP_ID")
-	appSecret := testSecrets.MustGetField("FACEBOOK_APP_SECRET")
-	inactiveAppSecret := testSecrets.MustGetField("FACEBOOK_APP_SECRET_INACTIVE")
+	appId := testSecrets.MustGetField(t, "FACEBOOK_APP_ID")
+	appSecret := testSecrets.MustGetField(t, "FACEBOOK_APP_SECRET")
+	inactiveAppSecret := testSecrets.MustGetField(t, "FACEBOOK_APP_SECRET_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

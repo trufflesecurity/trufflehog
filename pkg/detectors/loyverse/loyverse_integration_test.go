@@ -23,8 +23,8 @@ func TestLoyverse_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("LOYVERSE")
-	inactiveSecret := testSecrets.MustGetField("LOYVERSE_INACTIVE")
+	secret := testSecrets.MustGetField(t, "LOYVERSE")
+	inactiveSecret := testSecrets.MustGetField(t, "LOYVERSE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

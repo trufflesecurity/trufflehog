@@ -24,8 +24,8 @@ func TestNewRelicBrowserKey_FromChunk(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	key := testSecrets.MustGetField("NEW_RELIC_BROWSER_KEY")
-	keyEU := testSecrets.MustGetField("NEW_RELIC_BROWSER_KEY_EU")
+	key := testSecrets.MustGetField(t, "NEW_RELIC_BROWSER_KEY")
+	keyEU := testSecrets.MustGetField(t, "NEW_RELIC_BROWSER_KEY_EU")
 	keyInactive := "NRBR-cd83c5e6c53fe2edc1a"
 
 	type args struct {

@@ -23,9 +23,9 @@ func TestGraphCMS_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("GRAPHCMS_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("GRAPHCMS_INACTIVE")
-	id := testSecrets.MustGetField("GRAPHCMS_ID")
+	secret := testSecrets.MustGetField(t, "GRAPHCMS_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "GRAPHCMS_INACTIVE")
+	id := testSecrets.MustGetField(t, "GRAPHCMS_ID")
 
 	type args struct {
 		ctx    context.Context

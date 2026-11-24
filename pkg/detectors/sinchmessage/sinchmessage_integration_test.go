@@ -23,9 +23,9 @@ func TestSinchMessage_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("SINCHMESSAGE_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("SINCHMESSAGE_INACTIVE")
-	id := testSecrets.MustGetField("SINCHMESSAGE_PLANID")
+	secret := testSecrets.MustGetField(t, "SINCHMESSAGE_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "SINCHMESSAGE_INACTIVE")
+	id := testSecrets.MustGetField(t, "SINCHMESSAGE_PLANID")
 
 	type args struct {
 		ctx    context.Context

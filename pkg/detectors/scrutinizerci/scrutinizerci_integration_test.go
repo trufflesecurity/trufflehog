@@ -23,8 +23,8 @@ func TestScrutinizerCi_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("SCRUTINIZERCI")
-	inactiveSecret := testSecrets.MustGetField("SCRUTINIZERCI_INACTIVE")
+	secret := testSecrets.MustGetField(t, "SCRUTINIZERCI")
+	inactiveSecret := testSecrets.MustGetField(t, "SCRUTINIZERCI_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

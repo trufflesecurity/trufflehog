@@ -23,8 +23,8 @@ func TestBlitApp_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("BLITAPP")
-	inactiveSecret := testSecrets.MustGetField("BLITAPP_INACTIVE")
+	secret := testSecrets.MustGetField(t, "BLITAPP")
+	inactiveSecret := testSecrets.MustGetField(t, "BLITAPP_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
