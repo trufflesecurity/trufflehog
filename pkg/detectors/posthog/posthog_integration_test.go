@@ -23,8 +23,8 @@ func TestAppPosthog_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("APPPOSTHOG_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("APPPOSTHOG_INACTIVE")
+	secret := testSecrets.MustGetField(t, "APPPOSTHOG_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "APPPOSTHOG_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

@@ -23,9 +23,9 @@ func TestLuno_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("LUNO")
-	user := testSecrets.MustGetField("LUNO_USER")
-	inactiveSecret := testSecrets.MustGetField("LUNO_INACTIVE")
+	secret := testSecrets.MustGetField(t, "LUNO")
+	user := testSecrets.MustGetField(t, "LUNO_USER")
+	inactiveSecret := testSecrets.MustGetField(t, "LUNO_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

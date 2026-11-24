@@ -23,8 +23,8 @@ func TestHolistic_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("HOLISTIC")
-	inactiveSecret := testSecrets.MustGetField("HOLISTIC_INACTIVE")
+	secret := testSecrets.MustGetField(t, "HOLISTIC")
+	inactiveSecret := testSecrets.MustGetField(t, "HOLISTIC_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

@@ -23,9 +23,9 @@ func TestCustomerIO_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("CUSTOMERIO_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("CUSTOMERIO_INACTIVE")
-	id := testSecrets.MustGetField("CUSTOMERIO_ID")
+	secret := testSecrets.MustGetField(t, "CUSTOMERIO_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "CUSTOMERIO_INACTIVE")
+	id := testSecrets.MustGetField(t, "CUSTOMERIO_ID")
 
 	type args struct {
 		ctx    context.Context

@@ -23,9 +23,9 @@ func TestBitfinex_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	apiKey := testSecrets.MustGetField("BITFINEX_API_KEY")
-	inactiveApiKey := testSecrets.MustGetField("BITFINEX_API_KEY_INACTIVE")
-	apiSecret := testSecrets.MustGetField("BITFINEX_API_SECRET")
+	apiKey := testSecrets.MustGetField(t, "BITFINEX_API_KEY")
+	inactiveApiKey := testSecrets.MustGetField(t, "BITFINEX_API_KEY_INACTIVE")
+	apiSecret := testSecrets.MustGetField(t, "BITFINEX_API_SECRET")
 
 	type args struct {
 		ctx    context.Context

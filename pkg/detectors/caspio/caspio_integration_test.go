@@ -23,10 +23,10 @@ func TestCaspio_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("CASPIO")
-	id := testSecrets.MustGetField("CASPIO_ID")
-	subdomain := testSecrets.MustGetField("CASPIO_SUBDOMAIN")
-	inactiveSecret := testSecrets.MustGetField("CASPIO_INACTIVE")
+	secret := testSecrets.MustGetField(t, "CASPIO")
+	id := testSecrets.MustGetField(t, "CASPIO_ID")
+	subdomain := testSecrets.MustGetField(t, "CASPIO_SUBDOMAIN")
+	inactiveSecret := testSecrets.MustGetField(t, "CASPIO_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

@@ -23,8 +23,8 @@ func TestDroneCI_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("DRONECI_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("DRONECI_INACTIVE")
+	secret := testSecrets.MustGetField(t, "DRONECI_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "DRONECI_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

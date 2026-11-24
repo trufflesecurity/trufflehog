@@ -23,8 +23,8 @@ func TestBulbul_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("BULBUL")
-	inactiveSecret := testSecrets.MustGetField("BULBUL_INACTIVE")
+	secret := testSecrets.MustGetField(t, "BULBUL")
+	inactiveSecret := testSecrets.MustGetField(t, "BULBUL_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

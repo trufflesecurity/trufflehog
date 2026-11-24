@@ -23,8 +23,8 @@ func TestStorecove_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("STORECOVE")
-	inactiveSecret := testSecrets.MustGetField("STORECOVE_INACTIVE")
+	secret := testSecrets.MustGetField(t, "STORECOVE")
+	inactiveSecret := testSecrets.MustGetField(t, "STORECOVE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

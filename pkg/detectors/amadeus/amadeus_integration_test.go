@@ -23,9 +23,9 @@ func TestAmadeus_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	id := testSecrets.MustGetField("AMADEUS")
-	secret := testSecrets.MustGetField("AMADEUS_SECRET")
-	inactiveSecret := testSecrets.MustGetField("AMADEUS_INACTIVE")
+	id := testSecrets.MustGetField(t, "AMADEUS")
+	secret := testSecrets.MustGetField(t, "AMADEUS_SECRET")
+	inactiveSecret := testSecrets.MustGetField(t, "AMADEUS_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

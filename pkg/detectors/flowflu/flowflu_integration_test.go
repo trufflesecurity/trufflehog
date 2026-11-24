@@ -23,9 +23,9 @@ func TestFlowFlu_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	account := testSecrets.MustGetField("FLOWFLU_ACCOUNT")
-	secret := testSecrets.MustGetField("FLOWFLU_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("FLOWFLU_INACTIVE")
+	account := testSecrets.MustGetField(t, "FLOWFLU_ACCOUNT")
+	secret := testSecrets.MustGetField(t, "FLOWFLU_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "FLOWFLU_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

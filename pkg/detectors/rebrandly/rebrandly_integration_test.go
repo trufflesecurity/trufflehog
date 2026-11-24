@@ -23,8 +23,8 @@ func TestRebrandly_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("REBRANDLY")
-	inactiveSecret := testSecrets.MustGetField("REBRANDLY_INACTIVE")
+	secret := testSecrets.MustGetField(t, "REBRANDLY")
+	inactiveSecret := testSecrets.MustGetField(t, "REBRANDLY_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

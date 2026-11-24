@@ -23,8 +23,8 @@ func TestVisualcrossing_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("VISUALCROSSING")
-	inactiveSecret := testSecrets.MustGetField("VISUALCROSSING_INACTIVE")
+	secret := testSecrets.MustGetField(t, "VISUALCROSSING")
+	inactiveSecret := testSecrets.MustGetField(t, "VISUALCROSSING_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

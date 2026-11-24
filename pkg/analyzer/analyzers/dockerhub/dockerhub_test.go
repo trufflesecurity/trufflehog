@@ -107,8 +107,8 @@ func TestAnalyzer_Analyze(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	username := testSecrets.MustGetField("DOCKERHUB_USERNAME")
-	pat := testSecrets.MustGetField("DOCKERHUB_PAT")
+	username := testSecrets.MustGetField(t, "DOCKERHUB_USERNAME")
+	pat := testSecrets.MustGetField(t, "DOCKERHUB_PAT")
 
 	tests := []struct {
 		name     string

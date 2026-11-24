@@ -23,9 +23,9 @@ func TestCurrencycloud_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("CURRENCYCLOUD")
-	email := testSecrets.MustGetField("SCANNERS_EMAIL")
-	inactiveSecret := testSecrets.MustGetField("CURRENCYCLOUD_INACTIVE")
+	secret := testSecrets.MustGetField(t, "CURRENCYCLOUD")
+	email := testSecrets.MustGetField(t, "SCANNERS_EMAIL")
+	inactiveSecret := testSecrets.MustGetField(t, "CURRENCYCLOUD_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

@@ -23,8 +23,8 @@ func TestRiteKit_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("RITEKIT")
-	inactiveSecret := testSecrets.MustGetField("RITEKIT_INACTIVE")
+	secret := testSecrets.MustGetField(t, "RITEKIT")
+	inactiveSecret := testSecrets.MustGetField(t, "RITEKIT_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

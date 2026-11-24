@@ -23,8 +23,8 @@ func TestApiMetrics_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("APIMETRICS")
-	inactiveSecret := testSecrets.MustGetField("APIMETRICS_INACTIVE")
+	secret := testSecrets.MustGetField(t, "APIMETRICS")
+	inactiveSecret := testSecrets.MustGetField(t, "APIMETRICS_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

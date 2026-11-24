@@ -25,9 +25,9 @@ func TestHasura_FromData(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	secret := testSecrets.MustGetField("HASURA")
-	inactiveSecret := testSecrets.MustGetField("HASURA_INACTIVE")
-	domain := testSecrets.MustGetField("HASURA_DOMAIN")
+	secret := testSecrets.MustGetField(t, "HASURA")
+	inactiveSecret := testSecrets.MustGetField(t, "HASURA_INACTIVE")
+	domain := testSecrets.MustGetField(t, "HASURA_DOMAIN")
 
 	type args struct {
 		ctx    context.Context
@@ -152,7 +152,7 @@ func TestHasura_FromData(t *testing.T) {
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "verificationError", "primarySecret")
-			if diff := cmp.Diff(tt.want, got, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(tt.want, got, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("Hasura.FromData() %s - diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

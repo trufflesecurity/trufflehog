@@ -26,10 +26,10 @@ func TestSalesforceOauth2_FromData(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	domain := testSecrets.MustGetField("SALESFORCE_OAUTH2_DOMAIN")
-	consumerKey := testSecrets.MustGetField("SALESFORCE_OAUTH2_CONSUMER_KEY")
-	consumerSecret := testSecrets.MustGetField("SALESFORCE_OAUTH2_CONSUMER_SECRET")
-	inactiveSecret := testSecrets.MustGetField("SALESFORCE_OAUTH2_INACTIVE_CONSUMER_SECRET")
+	domain := testSecrets.MustGetField(t, "SALESFORCE_OAUTH2_DOMAIN")
+	consumerKey := testSecrets.MustGetField(t, "SALESFORCE_OAUTH2_CONSUMER_KEY")
+	consumerSecret := testSecrets.MustGetField(t, "SALESFORCE_OAUTH2_CONSUMER_SECRET")
+	inactiveSecret := testSecrets.MustGetField(t, "SALESFORCE_OAUTH2_INACTIVE_CONSUMER_SECRET")
 
 	type args struct {
 		data   []byte
@@ -151,6 +151,7 @@ func TestSalesforceOauth2_FromData(t *testing.T) {
 			// This checks that for every `want` result, there is a matching `got` result.
 			opts := []cmp.Option{
 				cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "ExtraData", "VerificationFromCache", "primarySecret"),
+				cmpopts.IgnoreUnexported(detectors.Result{}),
 				cmpopts.SortSlices(func(a, b detectors.Result) bool { return a.Verified }),
 			}
 			if diff := cmp.Diff(tt.want, got, opts...); diff != "" {

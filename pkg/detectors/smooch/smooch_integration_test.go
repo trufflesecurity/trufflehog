@@ -23,9 +23,9 @@ func TestSmooch_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("SMOOCH_SECRET")
-	id := testSecrets.MustGetField("SMOOCH_ID")
-	inactiveID := testSecrets.MustGetField("SMOOCH_INACTIVE")
+	secret := testSecrets.MustGetField(t, "SMOOCH_SECRET")
+	id := testSecrets.MustGetField(t, "SMOOCH_ID")
+	inactiveID := testSecrets.MustGetField(t, "SMOOCH_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

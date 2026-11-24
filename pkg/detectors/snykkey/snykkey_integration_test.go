@@ -23,8 +23,8 @@ func TestSnykKey_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("SNYKKEY_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("SNYKKEY_INACTIVE")
+	secret := testSecrets.MustGetField(t, "SNYKKEY_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "SNYKKEY_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

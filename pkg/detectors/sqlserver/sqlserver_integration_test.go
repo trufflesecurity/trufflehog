@@ -226,7 +226,7 @@ func TestSQLServer_FromChunk(t *testing.T) {
 			},
 			wantErr: false,
 			mockFunc: func() {
-				ping = func(config msdsn.Config) (bool, error) {
+				ping = func(_ context.Context, config msdsn.Config) (bool, error) {
 					return true, nil
 				}
 			},
@@ -248,7 +248,7 @@ func TestSQLServer_FromChunk(t *testing.T) {
 			},
 			wantErr: false,
 			mockFunc: func() {
-				ping = func(config msdsn.Config) (bool, error) {
+				ping = func(_ context.Context, config msdsn.Config) (bool, error) {
 					return false, nil
 				}
 			},
@@ -264,7 +264,7 @@ func TestSQLServer_FromChunk(t *testing.T) {
 			want:    nil,
 			wantErr: false,
 			mockFunc: func() {
-				ping = func(config msdsn.Config) (bool, error) {
+				ping = func(_ context.Context, config msdsn.Config) (bool, error) {
 					return true, nil
 				}
 			},
@@ -286,7 +286,7 @@ func TestSQLServer_FromChunk(t *testing.T) {
 			},
 			wantErr: false,
 			mockFunc: func() {
-				ping = func(config msdsn.Config) (bool, error) {
+				ping = func(_ context.Context, config msdsn.Config) (bool, error) {
 					if config.Host != "server_name" {
 						return false, errors.New("invalid host")
 					}

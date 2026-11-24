@@ -23,8 +23,8 @@ func TestBitLyAccessToken_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("BITLYACCESSTOKEN_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("BITLYACCESSTOKEN_INACTIVE")
+	secret := testSecrets.MustGetField(t, "BITLYACCESSTOKEN_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "BITLYACCESSTOKEN_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

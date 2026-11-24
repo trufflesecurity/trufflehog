@@ -22,8 +22,8 @@ func TestReachmail_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("REACHMAIL")
-	inactiveSecret := testSecrets.MustGetField("REACHMAIL_INACTIVE")
+	secret := testSecrets.MustGetField(t, "REACHMAIL")
+	inactiveSecret := testSecrets.MustGetField(t, "REACHMAIL_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

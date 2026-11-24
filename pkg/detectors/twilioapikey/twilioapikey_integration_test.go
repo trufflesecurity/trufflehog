@@ -25,9 +25,9 @@ func TestTwilioAPIKey_FromChunk(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	secret := testSecrets.MustGetField("TWILLIO_SECRET")
-	secretInactive := testSecrets.MustGetField("TWILLIO_SECRET_INACTIVE")
-	apiKey := testSecrets.MustGetField("TWILLIO_APIKEY")
+	secret := testSecrets.MustGetField(t, "TWILLIO_SECRET")
+	secretInactive := testSecrets.MustGetField(t, "TWILLIO_SECRET_INACTIVE")
+	apiKey := testSecrets.MustGetField(t, "TWILLIO_APIKEY")
 
 	type args struct {
 		ctx    context.Context
@@ -111,7 +111,7 @@ func TestTwilioAPIKey_FromChunk(t *testing.T) {
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "SecretParts")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("Twilio.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

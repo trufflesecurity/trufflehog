@@ -23,8 +23,8 @@ func TestDiscordWebhook_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("DISCORDWEBHOOK")
-	inactiveSecret := testSecrets.MustGetField("DISCORDWEBHOOK_INACTIVE")
+	secret := testSecrets.MustGetField(t, "DISCORDWEBHOOK")
+	inactiveSecret := testSecrets.MustGetField(t, "DISCORDWEBHOOK_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

@@ -23,8 +23,8 @@ func TestFinancialModelingPrep_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("FINANCIALMODELINGPREP")
-	inactiveSecret := testSecrets.MustGetField("FINANCIALMODELINGPREP_INACTIVE")
+	secret := testSecrets.MustGetField(t, "FINANCIALMODELINGPREP")
+	inactiveSecret := testSecrets.MustGetField(t, "FINANCIALMODELINGPREP_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

@@ -23,8 +23,8 @@ func TestStormglass_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("STORMGLASS")
-	inactiveSecret := testSecrets.MustGetField("STORMGLASS_INACTIVE")
+	secret := testSecrets.MustGetField(t, "STORMGLASS")
+	inactiveSecret := testSecrets.MustGetField(t, "STORMGLASS_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

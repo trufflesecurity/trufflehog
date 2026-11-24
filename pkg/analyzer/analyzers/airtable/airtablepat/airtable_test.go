@@ -31,7 +31,7 @@ func TestAnalyzer_Analyze(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			token:   testSecrets.MustGetField("AIRTABLEOAUTH_TOKEN"),
+			token:   testSecrets.MustGetField(t, "AIRTABLEOAUTH_TOKEN"),
 			name:    "valid Airtable Personal Access Token",
 			want:    string(expectedOutput),
 			wantErr: false,

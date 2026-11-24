@@ -23,8 +23,8 @@ func TestFinnhub_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("FINNHUB")
-	inactiveSecret := testSecrets.MustGetField("FINNHUB_INACTIVE")
+	secret := testSecrets.MustGetField(t, "FINNHUB")
+	inactiveSecret := testSecrets.MustGetField(t, "FINNHUB_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

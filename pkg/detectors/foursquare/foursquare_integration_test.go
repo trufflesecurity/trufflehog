@@ -23,9 +23,9 @@ func TestFoursquare_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	id := testSecrets.MustGetField("FOURSQUARE")
-	secret := testSecrets.MustGetField("FOURSQUARE_SECRET")
-	inactiveId := testSecrets.MustGetField("FOURSQUARE_INACTIVE")
+	id := testSecrets.MustGetField(t, "FOURSQUARE")
+	secret := testSecrets.MustGetField(t, "FOURSQUARE_SECRET")
+	inactiveId := testSecrets.MustGetField(t, "FOURSQUARE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

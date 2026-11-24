@@ -23,9 +23,9 @@ func TestConfluent_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("CONFLUENT_TOKEN")
-	key := testSecrets.MustGetField("CONFLUENT_KEY")
-	inactiveSecret := testSecrets.MustGetField("CONFLUENT_INACTIVE")
+	secret := testSecrets.MustGetField(t, "CONFLUENT_TOKEN")
+	key := testSecrets.MustGetField(t, "CONFLUENT_KEY")
+	inactiveSecret := testSecrets.MustGetField(t, "CONFLUENT_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

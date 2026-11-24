@@ -23,8 +23,8 @@ func TestUnplugg_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("UNPLUGG")
-	inactiveSecret := testSecrets.MustGetField("UNPLUGG_INACTIVE")
+	secret := testSecrets.MustGetField(t, "UNPLUGG")
+	inactiveSecret := testSecrets.MustGetField(t, "UNPLUGG_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

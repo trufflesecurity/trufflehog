@@ -23,9 +23,9 @@ func TestAdobeIO_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("ADOBEIO_TOKEN")
-	id := testSecrets.MustGetField("ADOBEIO_PRODUCT")
-	inactiveSecret := testSecrets.MustGetField("ADOBEIO_INACTIVE")
+	secret := testSecrets.MustGetField(t, "ADOBEIO_TOKEN")
+	id := testSecrets.MustGetField(t, "ADOBEIO_PRODUCT")
+	inactiveSecret := testSecrets.MustGetField(t, "ADOBEIO_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

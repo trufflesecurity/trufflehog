@@ -23,9 +23,9 @@ func TestPostmark_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secretServerApi := testSecrets.MustGetField("POSTMARK_TOKEN")
-	secretAccountApi := testSecrets.MustGetField("POSTMARK_ACCOUNT_API_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("POSTMARK_INACTIVE")
+	secretServerApi := testSecrets.MustGetField(t, "POSTMARK_TOKEN")
+	secretAccountApi := testSecrets.MustGetField(t, "POSTMARK_ACCOUNT_API_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "POSTMARK_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

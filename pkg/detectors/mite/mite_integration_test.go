@@ -23,9 +23,9 @@ func TestMite_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("MITE")
-	url := testSecrets.MustGetField("MITE_URL")
-	inactiveSecret := testSecrets.MustGetField("MITE_INACTIVE")
+	secret := testSecrets.MustGetField(t, "MITE")
+	url := testSecrets.MustGetField(t, "MITE_URL")
+	inactiveSecret := testSecrets.MustGetField(t, "MITE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

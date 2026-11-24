@@ -31,7 +31,7 @@ func TestAnalyzer_Analyze(t *testing.T) {
 	}{
 		{
 			name:    "valid OpenAI key",
-			key:     testSecrets.MustGetField("OPENAI_VERIFIED"),
+			key:     testSecrets.MustGetField(t, "OPENAI_VERIFIED"),
 			want:    expectedOutput,
 			wantErr: false,
 		},

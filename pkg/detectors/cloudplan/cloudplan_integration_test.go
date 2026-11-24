@@ -23,8 +23,8 @@ func TestCloudplan_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("CLOUDPLAN")
-	inactiveSecret := testSecrets.MustGetField("CLOUDPLAN_INACTIVE")
+	secret := testSecrets.MustGetField(t, "CLOUDPLAN")
+	inactiveSecret := testSecrets.MustGetField(t, "CLOUDPLAN_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

@@ -22,9 +22,9 @@ func TestLarksuite_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	tenantToken := testSecrets.MustGetField("LARKSUITE_TENANT")
-	userToken := testSecrets.MustGetField("LARKSUITE_USER")
-	appToken := testSecrets.MustGetField("LARKSUITE_APP")
+	tenantToken := testSecrets.MustGetField(t, "LARKSUITE_TENANT")
+	userToken := testSecrets.MustGetField(t, "LARKSUITE_USER")
+	appToken := testSecrets.MustGetField(t, "LARKSUITE_APP")
 
 	type args struct {
 		ctx    context.Context

@@ -23,9 +23,9 @@ func TestSauceLabs_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	id := testSecrets.MustGetField("SAUCELABS")
-	secret := testSecrets.MustGetField("SAUCELABS_SECRET")
-	inactiveSecret := testSecrets.MustGetField("SAUCELABS_SECRET_INACTIVE")
+	id := testSecrets.MustGetField(t, "SAUCELABS")
+	secret := testSecrets.MustGetField(t, "SAUCELABS_SECRET")
+	inactiveSecret := testSecrets.MustGetField(t, "SAUCELABS_SECRET_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

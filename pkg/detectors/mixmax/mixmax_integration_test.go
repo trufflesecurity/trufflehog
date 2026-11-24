@@ -23,8 +23,8 @@ func TestMixmax_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("MIXMAX")
-	inactiveSecret := testSecrets.MustGetField("MIXMAX_INACTIVE")
+	secret := testSecrets.MustGetField(t, "MIXMAX")
+	inactiveSecret := testSecrets.MustGetField(t, "MIXMAX_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

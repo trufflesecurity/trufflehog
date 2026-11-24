@@ -23,7 +23,7 @@ func TestDataDogApiKey_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	apiKey := testSecrets.MustGetField("DATADOGTOKEN_TOKEN")
+	apiKey := testSecrets.MustGetField(t, "DATADOGTOKEN_TOKEN")
 	invalidApiKey := "FKNwdbyfYTmGUm5DK3yHEuK-BBQf0fVG"
 	datdogEndpoint := "https://api.us5.datadoghq.com"
 	type args struct {

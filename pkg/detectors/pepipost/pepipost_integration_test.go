@@ -23,8 +23,8 @@ func TestPepipost_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("PEPIPOST_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("PEPIPOST_INACTIVE")
+	secret := testSecrets.MustGetField(t, "PEPIPOST_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "PEPIPOST_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

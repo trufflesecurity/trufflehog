@@ -23,8 +23,8 @@ func TestAudd_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("AUDD")
-	inactiveSecret := testSecrets.MustGetField("AUDD_INACTIVE")
+	secret := testSecrets.MustGetField(t, "AUDD")
+	inactiveSecret := testSecrets.MustGetField(t, "AUDD_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

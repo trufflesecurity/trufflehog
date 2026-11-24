@@ -23,8 +23,8 @@ func TestConvier_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("CONVIER")
-	inactiveSecret := testSecrets.MustGetField("CONVIER_INACTIVE")
+	secret := testSecrets.MustGetField(t, "CONVIER")
+	inactiveSecret := testSecrets.MustGetField(t, "CONVIER_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

@@ -23,8 +23,8 @@ func TestHtml2Pdf_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("HTML2PDF")
-	inactiveSecret := testSecrets.MustGetField("HTML2PDF_INACTIVE")
+	secret := testSecrets.MustGetField(t, "HTML2PDF")
+	inactiveSecret := testSecrets.MustGetField(t, "HTML2PDF_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

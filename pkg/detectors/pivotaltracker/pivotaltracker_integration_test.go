@@ -22,8 +22,8 @@ func TestPivotalTracker_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("PIVOTALTRACKER")
-	secretInactive := testSecrets.MustGetField("PIVOTALTRACKER_INACTIVE")
+	secret := testSecrets.MustGetField(t, "PIVOTALTRACKER")
+	secretInactive := testSecrets.MustGetField(t, "PIVOTALTRACKER_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

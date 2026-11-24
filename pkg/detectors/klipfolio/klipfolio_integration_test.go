@@ -23,8 +23,8 @@ func TestKlipfolio_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("KLIPFOLIO")
-	inactiveSecret := testSecrets.MustGetField("KLIPFOLIO_INACTIVE")
+	secret := testSecrets.MustGetField(t, "KLIPFOLIO")
+	inactiveSecret := testSecrets.MustGetField(t, "KLIPFOLIO_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

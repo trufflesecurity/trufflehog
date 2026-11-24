@@ -23,8 +23,8 @@ func TestCurrentsAPI_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("CURRENTSAPI")
-	inactiveSecret := testSecrets.MustGetField("CURRENTSAPI_INACTIVE")
+	secret := testSecrets.MustGetField(t, "CURRENTSAPI")
+	inactiveSecret := testSecrets.MustGetField(t, "CURRENTSAPI_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

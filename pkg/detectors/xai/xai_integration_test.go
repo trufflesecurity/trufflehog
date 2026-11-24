@@ -24,8 +24,8 @@ func TestXai_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("XAI")
-	inactiveSecret := testSecrets.MustGetField("XAI_INACTIVE")
+	secret := testSecrets.MustGetField(t, "XAI")
+	inactiveSecret := testSecrets.MustGetField(t, "XAI_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -137,7 +137,7 @@ func TestXai_FromChunk(t *testing.T) {
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "ExtraData")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("Xai.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

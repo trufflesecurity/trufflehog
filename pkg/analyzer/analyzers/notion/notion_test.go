@@ -32,7 +32,7 @@ func TestAnalyzer_Analyze(t *testing.T) {
 	}{
 		{
 			name:    "valid notion key",
-			key:     testSecrets.MustGetField("NOTION_TOKEN"),
+			key:     testSecrets.MustGetField(t, "NOTION_TOKEN"),
 			want:    string(expectedOutput),
 			wantErr: false,
 		},

@@ -32,7 +32,7 @@ func TestAnalyzer_Analyze(t *testing.T) {
 	}{
 		{
 			name:    "valid Postman key",
-			key:     testSecrets.MustGetField("POSTMAN_TOKEN"),
+			key:     testSecrets.MustGetField(t, "POSTMAN_TOKEN"),
 			want:    string(expectedOutput),
 			wantErr: false,
 		},

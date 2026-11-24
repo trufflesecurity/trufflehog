@@ -23,8 +23,8 @@ func TestViewneo_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("VIEWNEO")
-	inactiveSecret := testSecrets.MustGetField("VIEWNEO_INACTIVE")
+	secret := testSecrets.MustGetField(t, "VIEWNEO")
+	inactiveSecret := testSecrets.MustGetField(t, "VIEWNEO_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

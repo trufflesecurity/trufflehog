@@ -21,9 +21,9 @@ func TestStripepaymentintent_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("STRIPE_SECRET")
-	paymentIntent := testSecrets.MustGetField("STRIPE_PAYMENT_INTENT")
-	secretInactive := testSecrets.MustGetField("STRIPE_INACTIVE")
+	secret := testSecrets.MustGetField(t, "STRIPE_SECRET")
+	paymentIntent := testSecrets.MustGetField(t, "STRIPE_PAYMENT_INTENT")
+	secretInactive := testSecrets.MustGetField(t, "STRIPE_INACTIVE")
 	type args struct {
 		ctx    context.Context
 		data   []byte

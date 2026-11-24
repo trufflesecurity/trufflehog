@@ -23,8 +23,8 @@ func TestDiffbot_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("DIFFBOT")
-	inactiveSecret := testSecrets.MustGetField("DIFFBOT_INACTIVE")
+	secret := testSecrets.MustGetField(t, "DIFFBOT")
+	inactiveSecret := testSecrets.MustGetField(t, "DIFFBOT_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

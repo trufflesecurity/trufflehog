@@ -23,8 +23,8 @@ func TestFront_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("FRONT")
-	inactiveSecret := testSecrets.MustGetField("FRONT_INACTIVE")
+	secret := testSecrets.MustGetField(t, "FRONT")
+	inactiveSecret := testSecrets.MustGetField(t, "FRONT_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

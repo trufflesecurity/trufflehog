@@ -23,9 +23,9 @@ func TestLaunchDarkly_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	sdkSecret := testSecrets.MustGetField("LAUNCHDARKLY_SDK_TOKEN")
-	secret := testSecrets.MustGetField("LAUNCHDARKLY_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("LAUNCHDARKLY_INACTIVE")
+	sdkSecret := testSecrets.MustGetField(t, "LAUNCHDARKLY_SDK_TOKEN")
+	secret := testSecrets.MustGetField(t, "LAUNCHDARKLY_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "LAUNCHDARKLY_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

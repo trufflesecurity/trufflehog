@@ -23,9 +23,9 @@ func TestEnablex_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("ENABLEX")
-	user := testSecrets.MustGetField("ENABLEX_USER")
-	inactiveSecret := testSecrets.MustGetField("ENABLEX_INACTIVE")
+	secret := testSecrets.MustGetField(t, "ENABLEX")
+	user := testSecrets.MustGetField(t, "ENABLEX_USER")
+	inactiveSecret := testSecrets.MustGetField(t, "ENABLEX_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

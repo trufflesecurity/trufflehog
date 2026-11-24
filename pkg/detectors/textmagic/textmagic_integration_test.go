@@ -23,9 +23,9 @@ func TestTextmagic_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("TEXTMAGIC")
-	user := testSecrets.MustGetField("SCANNER_USERNAME")
-	inactiveSecret := testSecrets.MustGetField("TEXTMAGIC_INACTIVE")
+	secret := testSecrets.MustGetField(t, "TEXTMAGIC")
+	user := testSecrets.MustGetField(t, "SCANNER_USERNAME")
+	inactiveSecret := testSecrets.MustGetField(t, "TEXTMAGIC_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

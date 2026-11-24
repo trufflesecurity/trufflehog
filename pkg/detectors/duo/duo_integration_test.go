@@ -26,9 +26,9 @@ func TestDuo_FromChunk(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	host := testSecrets.MustGetField("DUO_APIHOST")
-	ikey := testSecrets.MustGetField("DUO_AUTH_IKEY")
-	skey := testSecrets.MustGetField("DUO_AUTH_SKEY")
+	host := testSecrets.MustGetField(t, "DUO_APIHOST")
+	ikey := testSecrets.MustGetField(t, "DUO_AUTH_IKEY")
+	skey := testSecrets.MustGetField(t, "DUO_AUTH_SKEY")
 	inactiveSKey := "CWZZCIOF2aEHdx2PfexiNC3Bedai2axLMC3C2IFe"
 
 	type args struct {
@@ -170,7 +170,7 @@ func TestDuo_FromChunk(t *testing.T) {
 				"primarySecret",
 			)
 
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("Duo.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
@@ -187,13 +187,13 @@ func TestDuo_FromChunk_AdminAPI(t *testing.T) {
 	}
 
 	// Auth API credentials
-	host := testSecrets.MustGetField("DUO_APIHOST")
+	host := testSecrets.MustGetField(t, "DUO_APIHOST")
 	inactiveSKey := "CWZZCIOF2aEHdx2PfexiNC3Bedai2axLMC3C2IFe"
 	inactiveIKey := "DIBJ9FGFZDD8BQKF6PN1"
 
 	// Admin API credentials
-	adminIKey := testSecrets.MustGetField("DUO_ADMIN_IKEY")
-	adminSKey := testSecrets.MustGetField("DUO_ADMIN_SKEY")
+	adminIKey := testSecrets.MustGetField(t, "DUO_ADMIN_IKEY")
+	adminSKey := testSecrets.MustGetField(t, "DUO_ADMIN_SKEY")
 
 	type args struct {
 		ctx    context.Context
@@ -286,7 +286,7 @@ func TestDuo_FromChunk_AdminAPI(t *testing.T) {
 				"primarySecret",
 			)
 
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("Duo.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

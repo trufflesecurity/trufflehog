@@ -23,8 +23,8 @@ func TestDfuse_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("DFUSE")
-	inactiveSecret := testSecrets.MustGetField("DFUSE_INACTIVE")
+	secret := testSecrets.MustGetField(t, "DFUSE")
+	inactiveSecret := testSecrets.MustGetField(t, "DFUSE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

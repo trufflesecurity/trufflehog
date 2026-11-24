@@ -23,8 +23,8 @@ func TestEdenAI_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("EDENAI")
-	inactiveSecret := testSecrets.MustGetField("EDENAI_INACTIVE")
+	secret := testSecrets.MustGetField(t, "EDENAI")
+	inactiveSecret := testSecrets.MustGetField(t, "EDENAI_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

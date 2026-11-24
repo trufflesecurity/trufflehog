@@ -24,8 +24,8 @@ func TestSendbirdOrganizationAPI_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("SENDBIRDORGANIZATIONAPI")
-	inactiveSecret := testSecrets.MustGetField("SENDBIRDORGANIZATIONAPI_INACTIVE")
+	secret := testSecrets.MustGetField(t, "SENDBIRDORGANIZATIONAPI")
+	inactiveSecret := testSecrets.MustGetField(t, "SENDBIRDORGANIZATIONAPI_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -137,7 +137,7 @@ func TestSendbirdOrganizationAPI_FromChunk(t *testing.T) {
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("Sendbird.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

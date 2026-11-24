@@ -23,9 +23,9 @@ func TestSpotifyKey_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	clientID := testSecrets.MustGetField("SPOTIFY_CLIENTID")
-	clientSecret := testSecrets.MustGetField("SPOTIFY_CLIENT_SECRET")
-	inactiveClientSecret := testSecrets.MustGetField("SPOTIFY_CLIENT_INACTIVE")
+	clientID := testSecrets.MustGetField(t, "SPOTIFY_CLIENTID")
+	clientSecret := testSecrets.MustGetField(t, "SPOTIFY_CLIENT_SECRET")
+	inactiveClientSecret := testSecrets.MustGetField(t, "SPOTIFY_CLIENT_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

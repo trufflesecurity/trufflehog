@@ -23,8 +23,8 @@ func TestAppSynergy_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("APPSYNERGY")
-	inactiveSecret := testSecrets.MustGetField("APPSYNERGY_INACTIVE")
+	secret := testSecrets.MustGetField(t, "APPSYNERGY")
+	inactiveSecret := testSecrets.MustGetField(t, "APPSYNERGY_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

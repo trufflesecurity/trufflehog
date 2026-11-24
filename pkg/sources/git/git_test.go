@@ -389,8 +389,8 @@ func TestSource_Scan(t *testing.T) {
 	if err != nil {
 		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
 	}
-	basicUser := secret.MustGetField("GITLAB_USER")
-	basicPass := secret.MustGetField("GITLAB_PASS")
+	basicUser := secret.MustGetField(t, "GITLAB_USER")
+	basicPass := secret.MustGetField(t, "GITLAB_PASS")
 
 	type init struct {
 		name        string
@@ -663,8 +663,8 @@ func TestSource_Chunks_Edge_Cases(t *testing.T) {
 	if err != nil {
 		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
 	}
-	basicUser := secret.MustGetField("GITLAB_USER")
-	basicPass := secret.MustGetField("GITLAB_PASS")
+	basicUser := secret.MustGetField(t, "GITLAB_USER")
+	basicPass := secret.MustGetField(t, "GITLAB_PASS")
 
 	type init struct {
 		name       string

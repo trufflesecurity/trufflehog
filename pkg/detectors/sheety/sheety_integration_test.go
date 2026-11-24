@@ -23,10 +23,10 @@ func TestSheety_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("SHEETY")
-	id := testSecrets.MustGetField("SHEETY_ID")
+	secret := testSecrets.MustGetField(t, "SHEETY")
+	id := testSecrets.MustGetField(t, "SHEETY_ID")
 
-	inactiveSecret := testSecrets.MustGetField("SHEETY_INACTIVE")
+	inactiveSecret := testSecrets.MustGetField(t, "SHEETY_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

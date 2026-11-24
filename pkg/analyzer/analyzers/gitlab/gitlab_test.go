@@ -30,7 +30,7 @@ func TestAnalyzer_Analyze(t *testing.T) {
 	}{
 		{
 			name:    "valid gitlab access token",
-			key:     testSecrets.MustGetField("GITLABV2"),
+			key:     testSecrets.MustGetField(t, "GITLABV2"),
 			want:    string(expectedOutput),
 			wantErr: false,
 		},

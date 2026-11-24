@@ -32,10 +32,10 @@ func TestSource_Scan(t *testing.T) {
 	if err != nil {
 		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
 	}
-	token := secret.MustGetField("GITLAB_TOKEN")
-	basicUser := secret.MustGetField("GITLAB_USER")
-	no2FaUser := secret.MustGetField("GITLAB_NO_2FA_USER")
-	no2FaPass := secret.MustGetField("GITLAB_NO_2FA_PASS")
+	token := secret.MustGetField(t, "GITLAB_TOKEN")
+	basicUser := secret.MustGetField(t, "GITLAB_USER")
+	no2FaUser := secret.MustGetField(t, "GITLAB_NO_2FA_USER")
+	no2FaPass := secret.MustGetField(t, "GITLAB_NO_2FA_PASS")
 
 	type init struct {
 		name       string
@@ -228,8 +228,8 @@ func TestSource_Validate(t *testing.T) {
 	if err != nil {
 		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
 	}
-	token := secret.MustGetField("GITLAB_TOKEN")
-	tokenWrongScope := secret.MustGetField("GITLAB_TOKEN_WRONG_SCOPE")
+	token := secret.MustGetField(t, "GITLAB_TOKEN")
+	tokenWrongScope := secret.MustGetField(t, "GITLAB_TOKEN_WRONG_SCOPE")
 
 	tests := []struct {
 		name         string
@@ -391,7 +391,7 @@ func TestSource_Chunks_TargetedScan(t *testing.T) {
 		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
 	}
 
-	token := secret.MustGetField("GITLAB_TOKEN")
+	token := secret.MustGetField(t, "GITLAB_TOKEN")
 
 	type init struct {
 		name          string
@@ -511,7 +511,7 @@ func TestSource_ChunkUnit_RepoFiltersRespected(t *testing.T) {
 	if err != nil {
 		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
 	}
-	token := secret.MustGetField("GITLAB_TOKEN")
+	token := secret.MustGetField(t, "GITLAB_TOKEN")
 
 	// Arrange: Build a unit to scan
 	unit := sources.CommonSourceUnit{
@@ -585,7 +585,7 @@ func TestSource_InclusionGlobbing(t *testing.T) {
 		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
 	}
 
-	token := secret.MustGetField("GITLAB_TOKEN")
+	token := secret.MustGetField(t, "GITLAB_TOKEN")
 
 	tests := []struct {
 		name             string
@@ -668,7 +668,7 @@ func TestSource_InclusionGlobbing(t *testing.T) {
 					return nil
 				},
 			}
-			apiClient, err := src.newClient()
+			apiClient, err := src.newClient(ctx)
 			assert.NoError(t, err)
 
 			var errs []error
@@ -694,7 +694,7 @@ func TestSource_Chunks_ProjectDetailsInChunkMetadata(t *testing.T) {
 		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
 	}
 
-	token := secret.MustGetField("GITLAB_TOKEN")
+	token := secret.MustGetField(t, "GITLAB_TOKEN")
 
 	tests := []struct {
 		name       string
@@ -767,7 +767,7 @@ func TestSource_Enumerate_ProjectDetailsInChunkMetadata(t *testing.T) {
 		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
 	}
 
-	token := secret.MustGetField("GITLAB_TOKEN")
+	token := secret.MustGetField(t, "GITLAB_TOKEN")
 
 	s := Source{}
 
@@ -836,7 +836,7 @@ func TestSource_Chunks_SimplifiedGitlabEnumeration(t *testing.T) {
 	secret, err := common.GetTestSecret(ctx)
 	require.NoError(t, err, "failed to access test secret")
 
-	token := secret.MustGetField("GITLAB_TOKEN")
+	token := secret.MustGetField(t, "GITLAB_TOKEN")
 
 	// Initialize the GitLab source with token-based authentication
 	s := Source{}

@@ -23,9 +23,9 @@ func TestAirbrakeProjectKey_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("AIRBRAKEPROJECTKEY_TOKEN")
-	id := testSecrets.MustGetField("AIRBRAKEPROJECTKEY_ID")
-	inactiveSecret := testSecrets.MustGetField("AIRBRAKEPROJECTKEY_INACTIVE")
+	secret := testSecrets.MustGetField(t, "AIRBRAKEPROJECTKEY_TOKEN")
+	id := testSecrets.MustGetField(t, "AIRBRAKEPROJECTKEY_ID")
+	inactiveSecret := testSecrets.MustGetField(t, "AIRBRAKEPROJECTKEY_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

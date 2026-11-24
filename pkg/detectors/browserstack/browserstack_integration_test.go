@@ -24,9 +24,9 @@ func TestBrowserStack_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secretUser := testSecrets.MustGetField("BROWSERSTACK_USER")
-	secret := testSecrets.MustGetField("BROWSERSTACK")
-	inactiveSecret := testSecrets.MustGetField("BROWSERSTACK_INACTIVE")
+	secretUser := testSecrets.MustGetField(t, "BROWSERSTACK_USER")
+	secret := testSecrets.MustGetField(t, "BROWSERSTACK")
+	inactiveSecret := testSecrets.MustGetField(t, "BROWSERSTACK_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -165,12 +165,14 @@ func TestBrowserStack_FromChunk(t *testing.T) {
 				if tt.want[i].VerificationError() != nil {
 					wantErr = tt.want[i].VerificationError().Error()
 				}
-				if gotErr != wantErr {
+				// Only check that an error is present. The timeout text changes between runs,
+				// and redaction drops the error type, so errors.Is does not work here.
+				if (gotErr != "") != (wantErr != "") {
 					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.want[i].VerificationError(), got[i].VerificationError())
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("BrowserStack.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

@@ -23,8 +23,8 @@ func TestBitcoinAverage_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("BITCOINAVERAGE")
-	inactiveSecret := testSecrets.MustGetField("BITCOINAVERAGE_INACTIVE")
+	secret := testSecrets.MustGetField(t, "BITCOINAVERAGE")
+	inactiveSecret := testSecrets.MustGetField(t, "BITCOINAVERAGE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

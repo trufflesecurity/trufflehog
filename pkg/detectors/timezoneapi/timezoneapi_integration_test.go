@@ -23,8 +23,8 @@ func TestTimezoneapi_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("TIMEZONEAPI")
-	inactiveSecret := testSecrets.MustGetField("TIMEZONEAPI_INACTIVE")
+	secret := testSecrets.MustGetField(t, "TIMEZONEAPI")
+	inactiveSecret := testSecrets.MustGetField(t, "TIMEZONEAPI_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

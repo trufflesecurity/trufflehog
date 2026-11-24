@@ -23,8 +23,8 @@ func TestKickbox_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("KICKBOX")
-	inactiveSecret := testSecrets.MustGetField("KICKBOX_INACTIVE")
+	secret := testSecrets.MustGetField(t, "KICKBOX")
+	inactiveSecret := testSecrets.MustGetField(t, "KICKBOX_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

@@ -24,9 +24,9 @@ func TestLiveAgent_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	deskUrl := testSecrets.MustGetField("LIVEAGENT_URL")
-	secret := testSecrets.MustGetField("LIVEAGENT_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("LIVEAGENT_INACTIVE")
+	deskUrl := testSecrets.MustGetField(t, "LIVEAGENT_URL")
+	secret := testSecrets.MustGetField(t, "LIVEAGENT_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "LIVEAGENT_INACTIVE")
 	u, err := url.Parse(deskUrl)
 	if err != nil {
 		t.Fatalf("could not parse LIVEAGENT_URL: %s", err)

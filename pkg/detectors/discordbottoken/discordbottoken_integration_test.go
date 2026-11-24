@@ -23,9 +23,9 @@ func TestDiscordBotToken_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("DISCORDBOTTOKEN_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("DISCORDBOTTOKEN_INACTIVE")
-	idSecret := testSecrets.MustGetField("DISCORDBOTTOKEN_USERID")
+	secret := testSecrets.MustGetField(t, "DISCORDBOTTOKEN_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "DISCORDBOTTOKEN_INACTIVE")
+	idSecret := testSecrets.MustGetField(t, "DISCORDBOTTOKEN_USERID")
 
 	type args struct {
 		ctx    context.Context

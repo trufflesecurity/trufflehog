@@ -20,7 +20,7 @@ func TestFirstResponseFromSSH(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secretGitHub := testSecrets.MustGetField("PRIVATEKEY_GITHUB")
+	secretGitHub := testSecrets.MustGetField(t, "PRIVATEKEY_GITHUB")
 
 	parsedKey, err := ssh.ParseRawPrivateKey([]byte(Normalize(secretGitHub)))
 	if err != nil {

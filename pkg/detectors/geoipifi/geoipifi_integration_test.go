@@ -23,8 +23,8 @@ func TestGeoIpifi_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("GEOIPIFI")
-	inactiveSecret := testSecrets.MustGetField("GEOIPIFI_INACTIVE")
+	secret := testSecrets.MustGetField(t, "GEOIPIFI")
+	inactiveSecret := testSecrets.MustGetField(t, "GEOIPIFI_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

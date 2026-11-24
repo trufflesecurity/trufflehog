@@ -14,10 +14,20 @@ import (
 
 type Secret struct{ kv map[string]string }
 
-func (s *Secret) MustGetField(name string) string {
+// fataler is the part of testing.TB that MustGetField needs. It keeps the
+// testing package out of this non-test file.
+type fataler interface {
+	Helper()
+	Fatalf(format string, args ...any)
+}
+
+// MustGetField fails the calling test when the field is missing. A panic here
+// would stop every other test in the package.
+func (s *Secret) MustGetField(t fataler, name string) string {
+	t.Helper()
 	val, ok := s.kv[name]
 	if !ok {
-		panic(errors.Errorf("field %s not found", name))
+		t.Fatalf("test secret field %s not found", name)
 	}
 	return val
 }

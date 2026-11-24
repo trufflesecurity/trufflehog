@@ -25,7 +25,7 @@ func TestBaseten_FromChunk(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 	// No active pre-prefix key can be issued anymore, so only a revoked one is tested.
-	inactiveSecret := testSecrets.MustGetField("BASETEN_V1_INACTIVE")
+	inactiveSecret := testSecrets.MustGetField(t, "BASETEN_V1_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

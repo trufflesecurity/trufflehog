@@ -23,8 +23,8 @@ func TestTLy_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("TLY")
-	inactiveSecret := testSecrets.MustGetField("TLY_INACTIVE")
+	secret := testSecrets.MustGetField(t, "TLY")
+	inactiveSecret := testSecrets.MustGetField(t, "TLY_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -101,13 +101,10 @@ func TestTLy_FromChunk(t *testing.T) {
 				detectors.Result{},
 				"ExtraData",
 				"verificationError",
-				"primarySecret",
 				"SecretParts",
-				"chunkOffset",
-				"chunkOffsetSet",
 			)
 
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("Tly.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

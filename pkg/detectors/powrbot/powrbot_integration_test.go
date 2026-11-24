@@ -23,8 +23,8 @@ func TestPowrbot_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("POWRBOT_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("POWRBOT_INACTIVE")
+	secret := testSecrets.MustGetField(t, "POWRBOT_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "POWRBOT_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

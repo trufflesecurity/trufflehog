@@ -24,8 +24,8 @@ func TestGroq_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("GROQ")
-	inactiveSecret := testSecrets.MustGetField("GROQ_INACTIVE")
+	secret := testSecrets.MustGetField(t, "GROQ")
+	inactiveSecret := testSecrets.MustGetField(t, "GROQ_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -137,7 +137,7 @@ func TestGroq_FromChunk(t *testing.T) {
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("Groq.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

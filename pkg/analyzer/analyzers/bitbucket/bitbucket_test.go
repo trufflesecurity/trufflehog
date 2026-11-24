@@ -32,7 +32,7 @@ func TestAnalyzer_Analyze(t *testing.T) {
 	}{
 		{
 			name:    "valid Bitbucket key",
-			key:     testSecrets.MustGetField("BITBUCKET_ANALYZE_TOKEN"),
+			key:     testSecrets.MustGetField(t, "BITBUCKET_ANALYZE_TOKEN"),
 			want:    string(expectedOutput),
 			wantErr: false,
 		},

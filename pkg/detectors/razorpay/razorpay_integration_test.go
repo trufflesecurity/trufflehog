@@ -24,7 +24,7 @@ func TestRazorPay_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secretInactive := testSecrets.MustGetField("RAZORPAY_INACTIVE")
+	secretInactive := testSecrets.MustGetField(t, "RAZORPAY_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

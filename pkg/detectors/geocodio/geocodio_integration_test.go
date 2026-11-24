@@ -23,9 +23,9 @@ func TestGeocodio_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("GEOCODIO")
-	search := testSecrets.MustGetField("GEOCODIO_SEARCH")
-	inactiveSecret := testSecrets.MustGetField("GEOCODIO_INACTIVE")
+	secret := testSecrets.MustGetField(t, "GEOCODIO")
+	search := testSecrets.MustGetField(t, "GEOCODIO_SEARCH")
+	inactiveSecret := testSecrets.MustGetField(t, "GEOCODIO_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

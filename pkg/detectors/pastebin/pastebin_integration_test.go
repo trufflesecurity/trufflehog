@@ -23,8 +23,8 @@ func TestPastebin_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("PASTEBIN")
-	inactiveSecret := testSecrets.MustGetField("PASTEBIN_INACTIVE")
+	secret := testSecrets.MustGetField(t, "PASTEBIN")
+	inactiveSecret := testSecrets.MustGetField(t, "PASTEBIN_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

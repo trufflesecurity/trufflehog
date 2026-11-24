@@ -24,8 +24,8 @@ func TestWeb3Storage_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("WEB3STORAGE")
-	inactiveSecret := testSecrets.MustGetField("WEB3STORAGE_INACTIVE")
+	secret := testSecrets.MustGetField(t, "WEB3STORAGE")
+	inactiveSecret := testSecrets.MustGetField(t, "WEB3STORAGE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -137,7 +137,7 @@ func TestWeb3Storage_FromChunk(t *testing.T) {
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("Web3Storage.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

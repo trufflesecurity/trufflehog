@@ -23,9 +23,9 @@ func TestTeamgate_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("TEAMGATE")
-	key := testSecrets.MustGetField("TEAMGATE_KEY")
-	inactiveSecret := testSecrets.MustGetField("TEAMGATE_INACTIVE")
+	secret := testSecrets.MustGetField(t, "TEAMGATE")
+	key := testSecrets.MustGetField(t, "TEAMGATE_KEY")
+	inactiveSecret := testSecrets.MustGetField(t, "TEAMGATE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

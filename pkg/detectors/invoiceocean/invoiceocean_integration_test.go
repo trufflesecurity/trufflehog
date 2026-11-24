@@ -23,9 +23,9 @@ func TestInvoiceocean_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("INVOICEOCEAN")
-	url := testSecrets.MustGetField("INVOICEOCEAN_URL")
-	inactiveSecret := testSecrets.MustGetField("INVOICEOCEAN_INACTIVE")
+	secret := testSecrets.MustGetField(t, "INVOICEOCEAN")
+	url := testSecrets.MustGetField(t, "INVOICEOCEAN_URL")
+	inactiveSecret := testSecrets.MustGetField(t, "INVOICEOCEAN_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

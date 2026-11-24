@@ -23,8 +23,8 @@ func TestDisqus_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("DISQUS")
-	inactiveSecret := testSecrets.MustGetField("DISQUS_INACTIVE")
+	secret := testSecrets.MustGetField(t, "DISQUS")
+	inactiveSecret := testSecrets.MustGetField(t, "DISQUS_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

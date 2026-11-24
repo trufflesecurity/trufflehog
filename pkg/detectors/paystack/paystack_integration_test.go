@@ -23,8 +23,8 @@ func TestPaystack_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("PAYSTACK_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("PAYSTACK_INACTIVE")
+	secret := testSecrets.MustGetField(t, "PAYSTACK_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "PAYSTACK_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

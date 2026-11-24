@@ -25,12 +25,12 @@ func TestVaultToken_FromData_Integration(t *testing.T) {
 		t.Fatalf("could not get test secrets: %s", err)
 	}
 
-	vaultURL := testSecrets.MustGetField("HASHICORPVAULT_CLOUD_URL")
+	vaultURL := testSecrets.MustGetField(t, "HASHICORPVAULT_CLOUD_URL")
 	// Token has maximum TTL of 32days (768h), so it should still be valid by the time this test runs
 	// but if the test fails due to an invalid token, this is the most likely culprit and the token may need to be regenerated.
 	// To regenerate the token run this command in vault web cli:
 	// write auth/token/create policies="test-policy" ttl="768h" display_name="integration-test-token"
-	token := testSecrets.MustGetField("HASHICORPVAULT_TOKEN")
+	token := testSecrets.MustGetField(t, "HASHICORPVAULT_TOKEN")
 
 	fakeToken := "hvs.CAESIDdRIXSyTRAmJ2nvTohWQOPZW4gtKBeuMCQ1amIgUcWtGigKImh2cy5wdEprMjdtZWNqRXJUeElXT0lXZ0lRZVQuV2JZVlgQ3_4Q" // invalid/unused token
 

@@ -25,9 +25,9 @@ func TestAzurebatch_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	url := testSecrets.MustGetField("AZUREBATCH_URL")
-	secret := testSecrets.MustGetField("AZUREBATCH_KEY")
-	inactiveSecret := testSecrets.MustGetField("AZUREBATCH_KEY_INACTIVE")
+	url := testSecrets.MustGetField(t, "AZUREBATCH_URL")
+	secret := testSecrets.MustGetField(t, "AZUREBATCH_KEY")
+	inactiveSecret := testSecrets.MustGetField(t, "AZUREBATCH_KEY_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -106,7 +106,7 @@ func TestAzurebatch_FromChunk(t *testing.T) {
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "RawV2", "Raw", "Redacted", "verificationError")
 
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("AzureBatch.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

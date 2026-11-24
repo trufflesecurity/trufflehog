@@ -23,8 +23,8 @@ func TestGlassnode_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("GLASSNODE")
-	inactiveSecret := testSecrets.MustGetField("GLASSNODE_INACTIVE")
+	secret := testSecrets.MustGetField(t, "GLASSNODE")
+	inactiveSecret := testSecrets.MustGetField(t, "GLASSNODE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

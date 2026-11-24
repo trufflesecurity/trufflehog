@@ -23,9 +23,9 @@ func TestZipbooks_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	email := testSecrets.MustGetField("SCANNERS_EMAIL")
-	pword := testSecrets.MustGetField("SCANNERS_PASS")
-	inactivePass := testSecrets.MustGetField("SCANNERS_INACTIVE")
+	email := testSecrets.MustGetField(t, "SCANNERS_EMAIL")
+	pword := testSecrets.MustGetField(t, "SCANNERS_PASS")
+	inactivePass := testSecrets.MustGetField(t, "SCANNERS_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

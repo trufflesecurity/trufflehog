@@ -23,9 +23,9 @@ func TestFmfw_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("FMFW")
-	user := testSecrets.MustGetField("FMFW_USER")
-	inactiveSecret := testSecrets.MustGetField("FMFW_INACTIVE")
+	secret := testSecrets.MustGetField(t, "FMFW")
+	user := testSecrets.MustGetField(t, "FMFW_USER")
+	inactiveSecret := testSecrets.MustGetField(t, "FMFW_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

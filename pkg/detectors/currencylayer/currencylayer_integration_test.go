@@ -23,8 +23,8 @@ func TestCurrencylayer_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("CURRENCYLAYER")
-	inactiveSecret := testSecrets.MustGetField("CURRENCYLAYER_INACTIVE")
+	secret := testSecrets.MustGetField(t, "CURRENCYLAYER")
+	inactiveSecret := testSecrets.MustGetField(t, "CURRENCYLAYER_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

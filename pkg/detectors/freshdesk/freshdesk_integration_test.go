@@ -23,9 +23,9 @@ func TestFreshdesk_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("FRESHDESK")
-	url := testSecrets.MustGetField("FRESHDESK_URL")
-	inactiveSecret := testSecrets.MustGetField("FRESHDESK_INACTIVE")
+	secret := testSecrets.MustGetField(t, "FRESHDESK")
+	url := testSecrets.MustGetField(t, "FRESHDESK_URL")
+	inactiveSecret := testSecrets.MustGetField(t, "FRESHDESK_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

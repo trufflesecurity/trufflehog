@@ -25,9 +25,9 @@ func TestAuth0ManagementApiToken_FromChunk(t *testing.T) {
 	}
 
 	// use 2592000 for 30 days, this is the maximum allowed
-	managementApiToken := testSecrets.MustGetField("AUTH0_MANAGEMENT_APITOKEN")
-	inactiveManagementApiToken := testSecrets.MustGetField("AUTH0_MANAGEMENT_APITOKEN_INACTIVE")
-	domain := testSecrets.MustGetField("AUTH0_MANAGEMENT_DOMAIN")
+	managementApiToken := testSecrets.MustGetField(t, "AUTH0_MANAGEMENT_APITOKEN")
+	inactiveManagementApiToken := testSecrets.MustGetField(t, "AUTH0_MANAGEMENT_APITOKEN_INACTIVE")
+	domain := testSecrets.MustGetField(t, "AUTH0_MANAGEMENT_DOMAIN")
 
 	type args struct {
 		ctx    context.Context

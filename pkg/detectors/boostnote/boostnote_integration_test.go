@@ -23,8 +23,8 @@ func TestBoostNote_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("BOOSTNOTE")
-	inactiveSecret := testSecrets.MustGetField("BOOSTNOTE_INACTIVE")
+	secret := testSecrets.MustGetField(t, "BOOSTNOTE")
+	inactiveSecret := testSecrets.MustGetField(t, "BOOSTNOTE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

@@ -23,9 +23,9 @@ func TestWebsitepulse_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("WEBSITEPULSE")
-	inactiveSecret := testSecrets.MustGetField("WEBSITEPULSE_INACTIVE")
-	id := testSecrets.MustGetField("WEBSITEPULSE_ID")
+	secret := testSecrets.MustGetField(t, "WEBSITEPULSE")
+	inactiveSecret := testSecrets.MustGetField(t, "WEBSITEPULSE_INACTIVE")
+	id := testSecrets.MustGetField(t, "WEBSITEPULSE_ID")
 
 	type args struct {
 		ctx    context.Context

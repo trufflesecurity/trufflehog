@@ -23,10 +23,10 @@ func TestStrava_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	id := testSecrets.MustGetField("STRAVA_ID")
-	secret := testSecrets.MustGetField("STRAVA_SECRET")
-	token := testSecrets.MustGetField("STRAVA_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("STRAVA_INACTIVE")
+	id := testSecrets.MustGetField(t, "STRAVA_ID")
+	secret := testSecrets.MustGetField(t, "STRAVA_SECRET")
+	token := testSecrets.MustGetField(t, "STRAVA_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "STRAVA_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

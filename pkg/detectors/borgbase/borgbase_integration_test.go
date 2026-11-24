@@ -23,8 +23,8 @@ func TestBorgbase_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("BORGBASE")
-	inactiveSecret := testSecrets.MustGetField("BORGBASE_INACTIVE")
+	secret := testSecrets.MustGetField(t, "BORGBASE")
+	inactiveSecret := testSecrets.MustGetField(t, "BORGBASE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

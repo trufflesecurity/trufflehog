@@ -23,8 +23,8 @@ func TestBlazemeter_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("BLAZEMETER")
-	inactiveSecret := testSecrets.MustGetField("BLAZEMETER_INACTIVE")
+	secret := testSecrets.MustGetField(t, "BLAZEMETER")
+	inactiveSecret := testSecrets.MustGetField(t, "BLAZEMETER_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

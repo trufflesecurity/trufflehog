@@ -25,10 +25,10 @@ func TestGitlabOauth_FromChunk(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	clientId := testSecrets.MustGetField("GITLABOAUTH_CLIENT_ID")
-	clientSecret := testSecrets.MustGetField("GITLABOAUTH_CLIENT_SECRET")
-	inactiveClientId := testSecrets.MustGetField("GITLABOAUTH_CLIENT_ID_INACTIVE")
-	inactiveClientSecret := testSecrets.MustGetField("GITLABOAUTH_CLIENT_SECRET_INACTIVE")
+	clientId := testSecrets.MustGetField(t, "GITLABOAUTH_CLIENT_ID")
+	clientSecret := testSecrets.MustGetField(t, "GITLABOAUTH_CLIENT_SECRET")
+	inactiveClientId := testSecrets.MustGetField(t, "GITLABOAUTH_CLIENT_ID_INACTIVE")
+	inactiveClientSecret := testSecrets.MustGetField(t, "GITLABOAUTH_CLIENT_SECRET_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -159,7 +159,7 @@ func TestGitlabOauth_FromChunk(t *testing.T) {
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{},
 				"Raw", "RawV2", "verificationError", "ExtraData", "primarySecret", "SecretParts")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("GitlabOauth.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

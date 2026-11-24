@@ -23,8 +23,8 @@ func TestGroovehq_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("GROOVEHQ_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("GROOVEHQ_INACTIVE")
+	secret := testSecrets.MustGetField(t, "GROOVEHQ_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "GROOVEHQ_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

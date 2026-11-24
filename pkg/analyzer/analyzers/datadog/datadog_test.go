@@ -32,8 +32,8 @@ func TestAnalyzer_Analyze(t *testing.T) {
 	}
 
 	// Get the required credentials
-	apiKey = testSecrets.MustGetField("DATADOG_API_KEY")
-	appKey = testSecrets.MustGetField("DATADOG_APP_KEY")
+	apiKey = testSecrets.MustGetField(t, "DATADOG_API_KEY")
+	appKey = testSecrets.MustGetField(t, "DATADOG_APP_KEY")
 
 	// Fail if credentials are not available
 	if apiKey == "" || appKey == "" {
@@ -168,7 +168,7 @@ func TestAnalyzer_Analyze_ApiKeyOnly(t *testing.T) {
 	}
 
 	// Get the required credentials
-	apiKey = testSecrets.MustGetField("DATADOG_API_KEY")
+	apiKey = testSecrets.MustGetField(t, "DATADOG_API_KEY")
 
 	// Fail if credentials are not available
 	if apiKey == "" {

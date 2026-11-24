@@ -23,8 +23,8 @@ func TestBesttime_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("BESTTIME")
-	inactiveSecret := testSecrets.MustGetField("BESTTIME_INACTIVE")
+	secret := testSecrets.MustGetField(t, "BESTTIME")
+	inactiveSecret := testSecrets.MustGetField(t, "BESTTIME_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

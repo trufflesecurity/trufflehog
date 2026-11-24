@@ -22,9 +22,9 @@ func TestOnelogin_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("ONELOGIN")
-	secretInactive := testSecrets.MustGetField("ONELOGIN_INACTIVE")
-	id := testSecrets.MustGetField("ONELOGIN_ID")
+	secret := testSecrets.MustGetField(t, "ONELOGIN")
+	secretInactive := testSecrets.MustGetField(t, "ONELOGIN_INACTIVE")
+	id := testSecrets.MustGetField(t, "ONELOGIN_ID")
 
 	type args struct {
 		ctx    context.Context

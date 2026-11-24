@@ -23,9 +23,9 @@ func TestTrelloApiKey_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	token := testSecrets.MustGetField("TRELLOAPIKEY_TOKEN")
-	apiKey := testSecrets.MustGetField("TRELLO_API_KEY")
-	inactiveApiKey := testSecrets.MustGetField("TRELLO_API_KEY_INACTIVE")
+	token := testSecrets.MustGetField(t, "TRELLOAPIKEY_TOKEN")
+	apiKey := testSecrets.MustGetField(t, "TRELLO_API_KEY")
+	inactiveApiKey := testSecrets.MustGetField(t, "TRELLO_API_KEY_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

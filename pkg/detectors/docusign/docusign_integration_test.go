@@ -23,9 +23,9 @@ func TestDocusign_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	integrationKey := testSecrets.MustGetField("DOCUSIGN_INTEGRATION_KEY_ACTIVE")
-	activeSecret := testSecrets.MustGetField("DOCUSIGN_SECRET_ACTIVE")
-	inactiveSecret := testSecrets.MustGetField("DOCUSIGN_SECRET_INACTIVE")
+	integrationKey := testSecrets.MustGetField(t, "DOCUSIGN_INTEGRATION_KEY_ACTIVE")
+	activeSecret := testSecrets.MustGetField(t, "DOCUSIGN_SECRET_ACTIVE")
+	inactiveSecret := testSecrets.MustGetField(t, "DOCUSIGN_SECRET_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

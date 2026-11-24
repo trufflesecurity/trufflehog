@@ -23,8 +23,8 @@ func TestLessAnnoyingCRM_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("LESSANNOYINGCRM_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("LESSANNOYINGCRM_INACTIVE")
+	secret := testSecrets.MustGetField(t, "LESSANNOYINGCRM_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "LESSANNOYINGCRM_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

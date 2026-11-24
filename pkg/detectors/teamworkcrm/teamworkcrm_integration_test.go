@@ -23,8 +23,8 @@ func TestTeamworkCRM_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("TEAMWORKCRM")
-	inactiveSecret := testSecrets.MustGetField("TEAMWORKCRM_INACTIVE")
+	secret := testSecrets.MustGetField(t, "TEAMWORKCRM")
+	inactiveSecret := testSecrets.MustGetField(t, "TEAMWORKCRM_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

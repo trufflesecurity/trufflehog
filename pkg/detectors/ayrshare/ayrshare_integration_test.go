@@ -23,8 +23,8 @@ func TestAyrshare_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("AYRSHARE_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("AYRSHARE_INACTIVE")
+	secret := testSecrets.MustGetField(t, "AYRSHARE_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "AYRSHARE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

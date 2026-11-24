@@ -23,10 +23,10 @@ func TestShutterstock_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	key := testSecrets.MustGetField("SHUTTERSTOCK_KEY")
-	inactiveKey := testSecrets.MustGetField("SHUTTERSTOCK_KEY_INACTIVE")
-	secret := testSecrets.MustGetField("SHUTTERSTOCK")
-	inactiveSecret := testSecrets.MustGetField("SHUTTERSTOCK_INACTIVE")
+	key := testSecrets.MustGetField(t, "SHUTTERSTOCK_KEY")
+	inactiveKey := testSecrets.MustGetField(t, "SHUTTERSTOCK_KEY_INACTIVE")
+	secret := testSecrets.MustGetField(t, "SHUTTERSTOCK")
+	inactiveSecret := testSecrets.MustGetField(t, "SHUTTERSTOCK_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

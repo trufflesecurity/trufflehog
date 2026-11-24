@@ -24,10 +24,10 @@ func TestDockerhub_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	username := testSecrets.MustGetField("DOCKERHUB_USERNAME")
-	email := testSecrets.MustGetField("DOCKERHUB_EMAIL")
-	pat := testSecrets.MustGetField("DOCKERHUB_PAT")
-	inactivePat := testSecrets.MustGetField("DOCKERHUB_INACTIVE_PAT")
+	username := testSecrets.MustGetField(t, "DOCKERHUB_USERNAME")
+	email := testSecrets.MustGetField(t, "DOCKERHUB_EMAIL")
+	pat := testSecrets.MustGetField(t, "DOCKERHUB_PAT")
+	inactivePat := testSecrets.MustGetField(t, "DOCKERHUB_INACTIVE_PAT")
 
 	type args struct {
 		ctx    context.Context

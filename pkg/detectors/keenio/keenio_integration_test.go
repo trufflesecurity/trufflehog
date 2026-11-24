@@ -23,9 +23,9 @@ func TestKeenIO_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("KEENIO")
-	inactiveSecret := testSecrets.MustGetField("KEENIO_INACTIVE")
-	orgId := testSecrets.MustGetField("KEENIO_ID")
+	secret := testSecrets.MustGetField(t, "KEENIO")
+	inactiveSecret := testSecrets.MustGetField(t, "KEENIO_INACTIVE")
+	orgId := testSecrets.MustGetField(t, "KEENIO_ID")
 
 	type args struct {
 		ctx    context.Context

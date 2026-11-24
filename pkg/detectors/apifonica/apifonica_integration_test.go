@@ -23,9 +23,9 @@ func TestApifonica_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("APIFONICA_SECRET")
-	token := testSecrets.MustGetField("APIFONICA_ID")
-	inactiveSecret := testSecrets.MustGetField("APIFONICA_INACTIVE")
+	secret := testSecrets.MustGetField(t, "APIFONICA_SECRET")
+	token := testSecrets.MustGetField(t, "APIFONICA_ID")
+	inactiveSecret := testSecrets.MustGetField(t, "APIFONICA_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

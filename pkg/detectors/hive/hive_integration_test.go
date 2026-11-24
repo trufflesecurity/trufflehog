@@ -23,9 +23,9 @@ func TestHive_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	id := testSecrets.MustGetField("HIVE")
-	secret := testSecrets.MustGetField("HIVE_SECRET")
-	inactiveSecret := testSecrets.MustGetField("HIVE_SECRET_INACTIVE")
+	id := testSecrets.MustGetField(t, "HIVE")
+	secret := testSecrets.MustGetField(t, "HIVE_SECRET")
+	inactiveSecret := testSecrets.MustGetField(t, "HIVE_SECRET_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

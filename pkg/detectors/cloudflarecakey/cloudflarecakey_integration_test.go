@@ -23,8 +23,8 @@ func TestCloudflareCaKey_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("CLOUDFLARE_ORIGIN_CA_KEY")
-	inactiveSecret := testSecrets.MustGetField("CLOUDFLARE_ORIGIN_CA_KEY_INACTIVE")
+	secret := testSecrets.MustGetField(t, "CLOUDFLARE_ORIGIN_CA_KEY")
+	inactiveSecret := testSecrets.MustGetField(t, "CLOUDFLARE_ORIGIN_CA_KEY_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

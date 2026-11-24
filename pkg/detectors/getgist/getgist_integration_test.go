@@ -23,8 +23,8 @@ func TestGetgist_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("GETGIST_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("GETGIST_INACTIVE")
+	secret := testSecrets.MustGetField(t, "GETGIST_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "GETGIST_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

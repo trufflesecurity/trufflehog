@@ -23,8 +23,8 @@ func TestMoosend_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("MOOSEND_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("MOOSEND_INACTIVE")
+	secret := testSecrets.MustGetField(t, "MOOSEND_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "MOOSEND_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

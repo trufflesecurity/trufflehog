@@ -23,10 +23,10 @@ func TestAzure_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("AZURE_SECRET")
-	secretInactive := testSecrets.MustGetField("AZURE_INACTIVE")
-	id := testSecrets.MustGetField("AZURE_ID")
-	tenantId := testSecrets.MustGetField("AZURE_TENANT_ID")
+	secret := testSecrets.MustGetField(t, "AZURE_SECRET")
+	secretInactive := testSecrets.MustGetField(t, "AZURE_INACTIVE")
+	id := testSecrets.MustGetField(t, "AZURE_ID")
+	tenantId := testSecrets.MustGetField(t, "AZURE_TENANT_ID")
 
 	type args struct {
 		ctx    context.Context

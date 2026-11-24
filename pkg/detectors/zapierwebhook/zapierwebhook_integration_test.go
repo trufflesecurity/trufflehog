@@ -23,8 +23,8 @@ func TestZapierWebhook_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("ZAPIERWEBHOOK_TOKEN")
-	// inactiveSecret := testSecrets.MustGetField("ZAPIERWEBHOOK_INACTIVE")
+	secret := testSecrets.MustGetField(t, "ZAPIERWEBHOOK_TOKEN")
+	// inactiveSecret := testSecrets.MustGetField(t, "ZAPIERWEBHOOK_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

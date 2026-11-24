@@ -23,8 +23,8 @@ func TestHiveage_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("HIVEAGE")
-	inactiveSecret := testSecrets.MustGetField("HIVEAGE_INACTIVE")
+	secret := testSecrets.MustGetField(t, "HIVEAGE")
+	inactiveSecret := testSecrets.MustGetField(t, "HIVEAGE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

@@ -22,8 +22,8 @@ func TestAnalyzer_Analyze(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	key := testSecrets.MustGetField("MUX_KEY")
-	secret := testSecrets.MustGetField("MUX_SECRET")
+	key := testSecrets.MustGetField(t, "MUX_KEY")
+	secret := testSecrets.MustGetField(t, "MUX_SECRET")
 
 	tests := []struct {
 		name    string

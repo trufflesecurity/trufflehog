@@ -23,9 +23,9 @@ func TestThinkific_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("THINKIFIC")
-	inactiveSecret := testSecrets.MustGetField("THINKIFIC_INACTIVE")
-	domain := testSecrets.MustGetField("THINKIFIC_DOMAIN")
+	secret := testSecrets.MustGetField(t, "THINKIFIC")
+	inactiveSecret := testSecrets.MustGetField(t, "THINKIFIC_INACTIVE")
+	domain := testSecrets.MustGetField(t, "THINKIFIC_DOMAIN")
 
 	type args struct {
 		ctx    context.Context

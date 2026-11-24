@@ -23,8 +23,8 @@ func TestPagerDutyApiKey_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("PAGERDUTYAPIKEY_TOKEN")
-	invalidSecret := testSecrets.MustGetField("PAGERDUTYAPIKEY_INACTIVE")
+	secret := testSecrets.MustGetField(t, "PAGERDUTYAPIKEY_TOKEN")
+	invalidSecret := testSecrets.MustGetField(t, "PAGERDUTYAPIKEY_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -197,7 +197,7 @@ func TestPagerDutyApiKey_FromChunk(t *testing.T) {
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("PagerDutyApiKey.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

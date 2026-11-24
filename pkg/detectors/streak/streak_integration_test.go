@@ -23,8 +23,8 @@ func TestStreak_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("STREAK")
-	inactiveSecret := testSecrets.MustGetField("STREAK_INACTIVE")
+	secret := testSecrets.MustGetField(t, "STREAK")
+	inactiveSecret := testSecrets.MustGetField(t, "STREAK_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

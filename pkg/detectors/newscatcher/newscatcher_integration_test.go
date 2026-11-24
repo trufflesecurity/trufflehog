@@ -23,8 +23,8 @@ func TestNewscatcher_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("NEWSCATCHER")
-	inactiveSecret := testSecrets.MustGetField("NEWSCATCHER_INACTIVE")
+	secret := testSecrets.MustGetField(t, "NEWSCATCHER")
+	inactiveSecret := testSecrets.MustGetField(t, "NEWSCATCHER_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

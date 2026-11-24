@@ -23,8 +23,8 @@ func TestImagga_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("IMAGGA")
-	inactiveSecret := testSecrets.MustGetField("IMAGGA_INACTIVE")
+	secret := testSecrets.MustGetField(t, "IMAGGA")
+	inactiveSecret := testSecrets.MustGetField(t, "IMAGGA_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

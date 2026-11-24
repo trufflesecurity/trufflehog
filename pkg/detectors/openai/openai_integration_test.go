@@ -24,8 +24,8 @@ func TestOpenAI_FromChunk(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	oaiUnverified := testSecrets.MustGetField("OPENAI_UNVERIFIED")
-	oaiVerified := testSecrets.MustGetField("OPENAI_VERIFIED")
+	oaiUnverified := testSecrets.MustGetField(t, "OPENAI_UNVERIFIED")
+	oaiVerified := testSecrets.MustGetField(t, "OPENAI_VERIFIED")
 
 	type args struct {
 		ctx    context.Context

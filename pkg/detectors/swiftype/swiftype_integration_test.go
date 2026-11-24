@@ -23,8 +23,8 @@ func TestSwiftype_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("SWIFTYPE")
-	inactiveSecret := testSecrets.MustGetField("SWIFTYPE_INACTIVE")
+	secret := testSecrets.MustGetField(t, "SWIFTYPE")
+	inactiveSecret := testSecrets.MustGetField(t, "SWIFTYPE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

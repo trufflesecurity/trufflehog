@@ -23,9 +23,9 @@ func TestCashboard_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("CASHBOARD")
-	user := testSecrets.MustGetField("SCANNER_USERNAME")
-	inactiveSecret := testSecrets.MustGetField("CASHBOARD_INACTIVE")
+	secret := testSecrets.MustGetField(t, "CASHBOARD")
+	user := testSecrets.MustGetField(t, "SCANNER_USERNAME")
+	inactiveSecret := testSecrets.MustGetField(t, "CASHBOARD_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

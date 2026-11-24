@@ -23,9 +23,9 @@ func TestHarvest_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("HARVEST_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("HARVEST_INACTIVE")
-	id := testSecrets.MustGetField("HARVEST_ID")
+	secret := testSecrets.MustGetField(t, "HARVEST_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "HARVEST_INACTIVE")
+	id := testSecrets.MustGetField(t, "HARVEST_ID")
 
 	type args struct {
 		ctx    context.Context

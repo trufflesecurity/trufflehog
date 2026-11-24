@@ -23,8 +23,8 @@ func TestMagnetic_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("MAGNETIC_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("MAGNETIC_INACTIVE")
+	secret := testSecrets.MustGetField(t, "MAGNETIC_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "MAGNETIC_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

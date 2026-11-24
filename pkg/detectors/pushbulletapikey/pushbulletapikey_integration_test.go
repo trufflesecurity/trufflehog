@@ -23,8 +23,8 @@ func TestPushBulletApiKey_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("PUSHBULLETAPIKEY_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("PUSHBULLETAPIKEY_INACTIVE")
+	secret := testSecrets.MustGetField(t, "PUSHBULLETAPIKEY_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "PUSHBULLETAPIKEY_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

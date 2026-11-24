@@ -23,9 +23,9 @@ func TestCensys_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("CENSYS")
-	id := testSecrets.MustGetField("CENSYS_ID")
-	inactiveSecret := testSecrets.MustGetField("CENSYS_INACTIVE")
+	secret := testSecrets.MustGetField(t, "CENSYS")
+	id := testSecrets.MustGetField(t, "CENSYS_ID")
+	inactiveSecret := testSecrets.MustGetField(t, "CENSYS_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

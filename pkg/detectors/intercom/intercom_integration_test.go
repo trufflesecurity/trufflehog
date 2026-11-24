@@ -23,8 +23,8 @@ func TestInterCom_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("INTERCOM_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("INTERCOM_INACTIVE")
+	secret := testSecrets.MustGetField(t, "INTERCOM_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "INTERCOM_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

@@ -31,7 +31,7 @@ func TestLambdaCloud_FromChunk(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 			s := Scanner{}
-			results, err := s.FromData(ctx, true, []byte("LAMBDA_API_KEY="+secrets.MustGetField(tt.field)))
+			results, err := s.FromData(ctx, true, []byte("LAMBDA_API_KEY="+secrets.MustGetField(t, tt.field)))
 			if err != nil || len(results) != 1 {
 				t.Fatal("expected one Lambda Cloud credential")
 			}

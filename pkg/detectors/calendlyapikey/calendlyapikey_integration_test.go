@@ -23,8 +23,8 @@ func TestCalendlyApiKey_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("CALENDLYAPIKEY_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("CALENDLYAPIKEY_INACTIVE")
+	secret := testSecrets.MustGetField(t, "CALENDLYAPIKEY_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "CALENDLYAPIKEY_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

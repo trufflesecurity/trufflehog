@@ -23,8 +23,8 @@ func TestFloat_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("FLOAT_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("FLOAT_INACTIVE")
+	secret := testSecrets.MustGetField(t, "FLOAT_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "FLOAT_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

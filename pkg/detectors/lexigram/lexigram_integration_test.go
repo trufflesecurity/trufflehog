@@ -23,8 +23,8 @@ func TestLexigram_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("LEXIGRAM")
-	inactiveSecret := testSecrets.MustGetField("LEXIGRAM_INACTIVE")
+	secret := testSecrets.MustGetField(t, "LEXIGRAM")
+	inactiveSecret := testSecrets.MustGetField(t, "LEXIGRAM_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
