@@ -1,8 +1,11 @@
 package detectors
 
 import (
+	"context"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/verifierauth"
@@ -76,14 +79,80 @@ func (e *EndpointSetter) Endpoints(foundEndpoints ...string) []string {
 	return endpoints
 }
 
-// VerificationClient returns the client a detector should use for
-// verification requests: base itself when no verifier auth is configured,
-// otherwise a copy of base that attaches the access token to requests for
-// the configured endpoints. Detectors call it wherever they would otherwise
-// use their verification client directly.
+// VerificationClient permits private addresses for initial requests to explicitly
+// configured origins (scheme, host, effective port), regardless of URL path or
+// endpoint provenance. Unconfigured discovered origins and all redirect hops
+// retain the detector's existing network restrictions.
+// Verifier authentication, when configured, is applied to configured origins.
+// Closing idle connections on the returned client also closes its verification pools.
 func (e *EndpointSetter) VerificationClient(base *http.Client) *http.Client {
-	if e.verifierAuth == nil {
-		return base
+	client := base
+	if len(e.configuredEndpoints) > 0 {
+		clone := *base
+		transport := base.Transport
+		if transport == nil {
+			transport = http.DefaultTransport
+		}
+		origins := make([]verifierOrigin, 0, len(e.configuredEndpoints))
+		for _, endpoint := range e.configuredEndpoints {
+			u, err := url.Parse(endpoint)
+			if err != nil || u.Host == "" {
+				continue
+			}
+			origins = append(origins, verifierOrigin{
+				scheme: u.Scheme,
+				host:   u.Hostname(),
+				port:   verifierPort(u),
+			})
+		}
+		clone.Transport = &configuredVerifierTransport{base: transport, origins: origins}
+		client = &clone
 	}
-	return e.verifierAuth.WrapClient(base, e.configuredEndpoints)
+	if e.verifierAuth != nil {
+		client = e.verifierAuth.WrapClient(client, e.configuredEndpoints)
+	}
+	return client
+}
+
+type verifierOrigin struct {
+	scheme string
+	host   string
+	port   string
+}
+
+type configuredVerifierTransport struct {
+	base    http.RoundTripper
+	origins []verifierOrigin
+}
+
+func (t *configuredVerifierTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if req.Response == nil {
+		host := req.URL.Hostname()
+		port := verifierPort(req.URL)
+		for _, origin := range t.origins {
+			if !strings.EqualFold(origin.scheme, req.URL.Scheme) ||
+				!strings.EqualFold(origin.host, host) || origin.port != port {
+				continue
+			}
+			clone := req.WithContext(context.WithValue(req.Context(), configuredVerifierKey{}, true))
+			return t.base.RoundTrip(clone)
+		}
+	}
+	return t.base.RoundTrip(req)
+}
+
+func (t *configuredVerifierTransport) CloseIdleConnections() {
+	if closer, ok := t.base.(interface{ CloseIdleConnections() }); ok {
+		closer.CloseIdleConnections()
+	}
+}
+
+func verifierPort(u *url.URL) string {
+	if port := u.Port(); port != "" {
+		return port
+	}
+	if strings.EqualFold(u.Scheme, "https") {
+		return "443"
+	}
+	return "80"
 }
