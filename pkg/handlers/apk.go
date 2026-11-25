@@ -134,9 +134,9 @@ type apkHandler struct {
 }
 
 // newAPKHandler creates an apkHandler.
-func newAPKHandler() *apkHandler {
+func newAPKHandler(opts ...defaultHandlerOption) *apkHandler {
 	return &apkHandler{
-		defaultHandler: newDefaultHandler(apkHandlerType),
+		defaultHandler: newDefaultHandler(apkHandlerType, opts...),
 		keywordMatcher: getDefaultDetectorKeywordMatcher(),
 	}
 }

@@ -16,8 +16,8 @@ import (
 type rpmHandler struct{ *defaultHandler }
 
 // newRPMHandler creates an rpmHandler with the provided metrics.
-func newRPMHandler() *rpmHandler {
-	return &rpmHandler{defaultHandler: newDefaultHandler(rpmHandlerType)}
+func newRPMHandler(opts ...defaultHandlerOption) *rpmHandler {
+	return &rpmHandler{defaultHandler: newDefaultHandler(rpmHandlerType, opts...)}
 }
 
 // HandleFile processes RPM formatted files.

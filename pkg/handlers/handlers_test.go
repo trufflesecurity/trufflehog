@@ -1,17 +1,21 @@
 package handlers
 
 import (
+	"archive/tar"
 	"archive/zip"
 	"bytes"
+	"compress/gzip"
 	stdctx "context"
 	_ "embed"
 	"errors"
 	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 	"testing/iotest"
@@ -885,6 +889,136 @@ func mockChunkReader(chunks []sources.ChunkResult) sources.ChunkReader {
 
 // TestPopulateChunkLineNumber verifies that populateChunkLineNumber correctly clones
 // metadata and sets line numbers for different metadata types.
+// countingReader counts the bytes read through it. It deliberately does not
+// implement io.Seeker, so HandleFile buffers it the way it buffers a pipe or an
+// HTTP response body.
+type countingReader struct {
+	r io.Reader
+	n int64
+}
+
+func (c *countingReader) Read(p []byte) (int, error) {
+	n, err := c.r.Read(p)
+	c.n += int64(n)
+	return n, err
+}
+
+// pngContent returns size bytes that mimetype detects as image/png, which the
+// default handler skips because ".png" is an ignored extension. The body is
+// random so it stays large after gzip compression.
+func pngContent(size int) []byte {
+	data := make([]byte, size)
+	_, _ = rand.New(rand.NewSource(1)).Read(data)
+	copy(data, "\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89")
+	return data
+}
+
+func gzipContent(t *testing.T, data []byte) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	w := gzip.NewWriter(&buf)
+	_, err := w.Write(data)
+	require.NoError(t, err)
+	require.NoError(t, w.Close())
+	return buf.Bytes()
+}
+
+func tarContent(t *testing.T, files map[string][]byte) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	w := tar.NewWriter(&buf)
+	names := make([]string, 0, len(files))
+	for name := range files {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		require.NoError(t, w.WriteHeader(&tar.Header{Name: name, Mode: 0o644, Size: int64(len(files[name]))}))
+		_, err := w.Write(files[name])
+		require.NoError(t, err)
+	}
+	require.NoError(t, w.Close())
+	return buf.Bytes()
+}
+
+// handleCounting runs HandleFile over data and returns how many bytes it read
+// and the data of every chunk it reported.
+func handleCounting(t *testing.T, data []byte, options ...func(*fileHandlingConfig)) (int64, [][]byte) {
+	t.Helper()
+	reader := &countingReader{r: bytes.NewReader(data)}
+	chunkCh := make(chan *sources.Chunk, 1024)
+	var chunks [][]byte
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for chunk := range chunkCh {
+			chunks = append(chunks, chunk.Data)
+		}
+	}()
+	err := HandleFile(context.Background(), reader, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh}, options...)
+	close(chunkCh)
+	<-done
+	require.NoError(t, err)
+	return reader.n, chunks
+}
+
+func TestHandleFileDrainSkipped(t *testing.T) {
+	const size = 8 << 20
+	// The handler detects the MIME type from the first few KiB. A skipped file
+	// that is not drained must cost no more than one buffered read past that.
+	const maxUndrainedRead = 64 << 10
+
+	tests := []struct {
+		name      string
+		data      []byte
+		options   []func(*fileHandlingConfig)
+		wantDrain bool
+	}{
+		{name: "default drains skipped content", data: pngContent(size), wantDrain: true},
+		{name: "true drains skipped content", data: pngContent(size), options: []func(*fileHandlingConfig){WithDrainSkipped(true)}, wantDrain: true},
+		{name: "false stops after detection", data: pngContent(size), options: []func(*fileHandlingConfig){WithDrainSkipped(false)}},
+		{name: "default drains skipped content inside gzip", data: gzipContent(t, pngContent(size)), wantDrain: true},
+		{name: "false stops after detection inside gzip", data: gzipContent(t, pngContent(size)), options: []func(*fileHandlingConfig){WithDrainSkipped(false)}},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			read, chunks := handleCounting(t, tc.data, tc.options...)
+			assert.Empty(t, chunks, "skipped content must not produce chunks")
+			if tc.wantDrain {
+				assert.Equal(t, int64(len(tc.data)), read, "skipped content should be read to EOF")
+				return
+			}
+			assert.LessOrEqual(t, read, int64(maxUndrainedRead), "skipped content should not be read to EOF")
+		})
+	}
+}
+
+func TestHandleFileDrainSkippedLeavesScannedContentUnchanged(t *testing.T) {
+	text := []byte(strings.Repeat("aws_access_key_id = AKIAEXAMPLEEXAMPLE00\n", 1<<15))
+	inputs := map[string][]byte{
+		"text":                text,
+		"tar of png and text": tarContent(t, map[string][]byte{"image": pngContent(1 << 20), "notes.txt": text}),
+		"gzip of text":        gzipContent(t, text),
+	}
+	entries, err := os.ReadDir("testdata")
+	require.NoError(t, err)
+	for _, entry := range entries {
+		data, err := os.ReadFile(filepath.Join("testdata", entry.Name()))
+		require.NoError(t, err)
+		inputs["testdata/"+entry.Name()] = data
+	}
+
+	for name, data := range inputs {
+		t.Run(name, func(t *testing.T) {
+			defaultRead, defaultChunks := handleCounting(t, data)
+			undrainedRead, undrainedChunks := handleCounting(t, data, WithDrainSkipped(false))
+			assert.Equal(t, defaultChunks, undrainedChunks)
+			assert.Equal(t, defaultRead, undrainedRead)
+		})
+	}
+}
+
 func TestPopulateChunkLineNumber(t *testing.T) {
 	tests := []struct {
 		name       string

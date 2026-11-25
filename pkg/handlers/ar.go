@@ -16,8 +16,8 @@ import (
 type arHandler struct{ *defaultHandler }
 
 // newARHandler creates an arHandler.
-func newARHandler() *arHandler {
-	return &arHandler{defaultHandler: newDefaultHandler(arHandlerType)}
+func newARHandler(opts ...defaultHandlerOption) *arHandler {
+	return &arHandler{defaultHandler: newDefaultHandler(arHandlerType, opts...)}
 }
 
 // HandleFile processes AR formatted files and returns a channel of DataOrErr.
