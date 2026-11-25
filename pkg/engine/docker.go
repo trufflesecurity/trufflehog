@@ -1,8 +1,6 @@
 package engine
 
 import (
-	"runtime"
-
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -41,9 +39,21 @@ func (e *Engine) ScanDocker(ctx context.Context, c sources.DockerConfig) (source
 	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, docker.SourceType)
 	ctx = withSourceFields(ctx, sourceName, docker.SourceType, sourceID, jobID)
 
-	dockerSource := &docker.Source{}
-	if err := dockerSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
+	dockerSource, err := e.newDockerSource(ctx, sourceName, jobID, sourceID, &conn)
+	if err != nil {
 		return sources.JobProgressRef{}, err
 	}
 	return e.sourceManager.EnumerateAndScan(ctx, sourceName, dockerSource)
+}
+
+// newDockerSource builds the docker source for a scan. It passes the engine's
+// configured concurrency through, so --concurrency caps how many layers are
+// scanned at once (each holding 128 MiB of gzip read-ahead) instead of the
+// number of CPUs visible to the process.
+func (e *Engine) newDockerSource(ctx context.Context, sourceName string, jobID sources.JobID, sourceID sources.SourceID, conn *anypb.Any) (*docker.Source, error) {
+	dockerSource := &docker.Source{}
+	if err := dockerSource.Init(ctx, sourceName, jobID, sourceID, true, conn, e.concurrency); err != nil {
+		return nil, err
+	}
+	return dockerSource, nil
 }
