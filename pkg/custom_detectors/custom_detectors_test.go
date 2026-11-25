@@ -244,6 +244,32 @@ func TestDetector(t *testing.T) {
 	assert.Equal(t, map[string]string{"regex": "123456"}, results[0].SecretParts)
 }
 
+func TestDetectorExcludeWordsCaseInsensitive(t *testing.T) {
+	detector, err := NewWebhookCustomRegex(&custom_detectorspb.CustomRegex{
+		Name:         "test",
+		Keywords:     []string{"secret"},
+		Regex:        map[string]string{"secret": `secret="([^"]+)"`},
+		ExcludeWords: []string{"TEST", "Example"},
+	})
+	require.NoError(t, err)
+
+	// Test 1: lowercase secret "test123" should be excluded by "TEST"
+	results, err := detector.FromData(context.Background(), false, []byte(`secret="test123"`))
+	require.NoError(t, err)
+	assert.Equal(t, 0, len(results), "uppercase exclude word should match lowercase secret")
+
+	// Test 2: mixed-case secret "ExAmPlE123" should be excluded by "Example"
+	results, err = detector.FromData(context.Background(), false, []byte(`secret="ExAmPlE123"`))
+	require.NoError(t, err)
+	assert.Equal(t, 0, len(results), "mixed-case exclude word should match mixed-case secret")
+
+	// Test 3: secret without exclude word should still be detected
+	results, err = detector.FromData(context.Background(), false, []byte(`secret="allowed123"`))
+	require.NoError(t, err)
+	assert.Equal(t, 1, len(results), "secret without exclude word should be detected")
+	assert.Equal(t, "allowed123", results[0].SecretParts["secret"])
+}
+
 func TestDetectorPrimarySecret(t *testing.T) {
 	detector, err := NewWebhookCustomRegex(&custom_detectorspb.CustomRegex{
 		Name:             "test",
