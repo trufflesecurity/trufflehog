@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -20,6 +21,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sourcestest"
 )
 
 // testUnitReporter records everything Enumerate reports.
@@ -398,4 +400,267 @@ func TestUnmarshalSourceUnit(t *testing.T) {
 			assert.Equal(t, SourceUnitKindJob, kind)
 		})
 	}
+}
+
+// createMockJenkinsBuildsServer serves two jobs for the ChunkUnit tests:
+//
+//	/job/good       builds 1 and 2; build 2's log is forbidden when brokenLog is set
+//	/job/no-builds  whose builds listing is forbidden
+//
+// Failures use 403 rather than 500 so the client's 5XX retry policy doesn't
+// stall the tests.
+func createMockJenkinsBuildsServer(brokenLog bool) *httptest.Server {
+	mux := http.NewServeMux()
+	server := httptest.NewServer(mux)
+
+	mux.HandleFunc("/api/json", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if !strings.Contains(r.URL.RawQuery, "tree=jobs") {
+			_, _ = fmt.Fprint(w, `{"jobs":[]}`)
+			return
+		}
+		_, _ = fmt.Fprintf(w, `{"jobs":[`+
+			`{"_class":"org.jenkinsci.plugins.workflow.job.WorkflowJob","name":"good","url":"%[1]s/job/good/"},`+
+			`{"_class":"hudson.model.FreeStyleProject","name":"no-builds","url":"%[1]s/job/no-builds/"}]}`, server.URL)
+	})
+	mux.HandleFunc("/job/good/api/json", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = fmt.Fprintf(w, `{"builds":[{"number":1,"url":"%[1]s/job/good/1/"},{"number":2,"url":"%[1]s/job/good/2/"}]}`, server.URL)
+	})
+	mux.HandleFunc("/job/good/1/consoleText", func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = fmt.Fprint(w, "build one log")
+	})
+	mux.HandleFunc("/job/good/2/consoleText", func(w http.ResponseWriter, _ *http.Request) {
+		if brokenLog {
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
+		_, _ = fmt.Fprint(w, "build two log")
+	})
+	mux.HandleFunc("/job/no-builds/api/json", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+	})
+
+	return server
+}
+
+// buildNumbers returns the build number of every reported chunk, sorted.
+func buildNumbers(t *testing.T, chunks []sources.Chunk) []int64 {
+	t.Helper()
+	numbers := make([]int64, 0, len(chunks))
+	for _, chunk := range chunks {
+		meta := chunk.SourceMetadata.GetJenkins()
+		require.NotNil(t, meta)
+		numbers = append(numbers, meta.BuildNumber)
+	}
+	slices.Sort(numbers)
+	return numbers
+}
+
+func TestChunkUnit(t *testing.T) {
+	server := createMockJenkinsBuildsServer(false)
+	defer server.Close()
+
+	ctx := context.Background()
+	s := newTestSource(t, ctx, server.URL, "chunk-unit")
+
+	reporter := &sourcestest.TestReporter{}
+	require.NoError(t, s.ChunkUnit(ctx, JenkinsJob{Name: "good", Path: "/job/good"}, reporter))
+
+	assert.Empty(t, reporter.ChunkErrs)
+	assert.Equal(t, []int64{1, 2}, buildNumbers(t, reporter.Chunks))
+	for _, chunk := range reporter.Chunks {
+		meta := chunk.SourceMetadata.GetJenkins()
+		assert.Equal(t, "good", meta.ProjectName)
+		assert.Equal(t, fmt.Sprintf("%s/job/good/%d/consoleText", server.URL, meta.BuildNumber), meta.Link)
+		assert.Equal(t, "chunk-unit", chunk.SourceName)
+	}
+}
+
+func TestChunkUnitBuildListFails(t *testing.T) {
+	server := createMockJenkinsBuildsServer(false)
+	defer server.Close()
+
+	ctx := context.Background()
+	s := newTestSource(t, ctx, server.URL, "chunk-unit")
+
+	reporter := &sourcestest.TestReporter{}
+	require.NoError(t, s.ChunkUnit(ctx, JenkinsJob{Name: "no-builds", Path: "/job/no-builds"}, reporter),
+		"a job-level failure is reported, not returned")
+
+	assert.Empty(t, reporter.Chunks)
+	require.Len(t, reporter.ChunkErrs, 1)
+	assert.Contains(t, reporter.ChunkErrs[0].Error(), "/job/no-builds")
+}
+
+func TestChunkUnitOneBuildLogFails(t *testing.T) {
+	server := createMockJenkinsBuildsServer(true)
+	defer server.Close()
+
+	ctx := context.Background()
+	s := newTestSource(t, ctx, server.URL, "chunk-unit")
+
+	reporter := &sourcestest.TestReporter{}
+	require.NoError(t, s.ChunkUnit(ctx, JenkinsJob{Name: "good", Path: "/job/good"}, reporter))
+
+	assert.Equal(t, []int64{1}, buildNumbers(t, reporter.Chunks), "the healthy build is still scanned")
+	require.Len(t, reporter.ChunkErrs, 1)
+	assert.Contains(t, reporter.ChunkErrs[0].Error(), "build 2")
+}
+
+func TestChunkUnitFromUnmarshalledUnit(t *testing.T) {
+	server := createMockJenkinsBuildsServer(false)
+	defer server.Close()
+
+	ctx := context.Background()
+	s := newTestSource(t, ctx, server.URL, "chunk-unit")
+
+	full := JenkinsJob{
+		Class: "org.jenkinsci.plugins.workflow.job.WorkflowJob",
+		Name:  "good",
+		Url:   server.URL + "/job/good/",
+		Path:  "/job/good",
+	}
+	fullData, err := json.Marshal(full)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name     string
+		envelope unitEnvelope
+	}{
+		{
+			name:     "with unit_data",
+			envelope: unitEnvelope{ID: "/job/good", Kind: "job", UnitData: base64.StdEncoding.EncodeToString(fullData)},
+		},
+		{
+			// Rebuilt from the ID alone, so the project name comes from Display.
+			name:     "id only",
+			envelope: unitEnvelope{ID: "/job/good", Kind: "job"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			data, err := json.Marshal(tt.envelope)
+			require.NoError(t, err)
+			unit, err := s.UnmarshalSourceUnit(data)
+			require.NoError(t, err)
+
+			reporter := &sourcestest.TestReporter{}
+			require.NoError(t, s.ChunkUnit(ctx, unit, reporter))
+
+			assert.Empty(t, reporter.ChunkErrs)
+			assert.Equal(t, []int64{1, 2}, buildNumbers(t, reporter.Chunks))
+			for _, chunk := range reporter.Chunks {
+				assert.Equal(t, "good", chunk.SourceMetadata.GetJenkins().ProjectName)
+			}
+		})
+	}
+}
+
+// otherUnit is a SourceUnit that is not a JenkinsJob.
+type otherUnit struct{}
+
+func (otherUnit) SourceUnitID() (string, sources.SourceUnitKind) { return "other", "other" }
+func (otherUnit) Display() string                                { return "other" }
+
+func TestChunkUnitRejectsWrongUnitType(t *testing.T) {
+	ctx := context.Background()
+	s := newTestSource(t, ctx, "http://jenkins.invalid", "chunk-unit")
+
+	reporter := &sourcestest.TestReporter{}
+	assert.Error(t, s.ChunkUnit(ctx, otherUnit{}, reporter))
+	assert.Empty(t, reporter.Chunks)
+}
+
+func TestChunkUnitCancelledContext(t *testing.T) {
+	server := createMockJenkinsBuildsServer(false)
+	defer server.Close()
+
+	s := newTestSource(t, context.Background(), server.URL, "chunk-unit")
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	reporter := &sourcestest.TestReporter{}
+	err := s.ChunkUnit(ctx, JenkinsJob{Name: "good", Path: "/job/good"}, reporter)
+	assert.ErrorIs(t, err, ctx.Err())
+	assert.Empty(t, reporter.Chunks)
+}
+
+// TestChunkUnitCancelledDuringBuildLog cancels the scan while the last build's
+// log is being fetched. The cancellation must be returned rather than reported
+// as a fault of the job, as TestReporter, like the SourceManager's reporter,
+// swallows reported errors.
+func TestChunkUnitCancelledDuringBuildLog(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	mux := http.NewServeMux()
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	mux.HandleFunc("/job/good/api/json", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = fmt.Fprintf(w, `{"builds":[{"number":1,"url":"%[1]s/job/good/1/"},{"number":2,"url":"%[1]s/job/good/2/"}]}`, server.URL)
+	})
+	mux.HandleFunc("/job/good/1/consoleText", func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = fmt.Fprint(w, "build one log")
+	})
+	mux.HandleFunc("/job/good/2/consoleText", func(_ http.ResponseWriter, r *http.Request) {
+		cancel()
+		select {
+		case <-r.Context().Done():
+		case <-time.After(5 * time.Second):
+		}
+	})
+
+	s := newTestSource(t, context.Background(), server.URL, "chunk-unit")
+
+	reporter := &sourcestest.TestReporter{}
+	err := s.ChunkUnit(ctx, JenkinsJob{Name: "good", Path: "/job/good"}, reporter)
+	assert.ErrorIs(t, err, ctx.Err())
+	assert.Empty(t, reporter.ChunkErrs, "a cancelled fetch is not a job error")
+	assert.Equal(t, []int64{1}, buildNumbers(t, reporter.Chunks), "builds before the cancellation are still scanned")
+}
+
+// TestSourceManagerReportsErroredJobUnit runs the source through the
+// SourceManager's unit path, checking that a job which fails is reported as an
+// errored unit while the other job is still scanned.
+func TestSourceManagerReportsErroredJobUnit(t *testing.T) {
+	server := createMockJenkinsBuildsServer(false)
+	defer server.Close()
+
+	ctx := context.Background()
+	s := newTestSource(t, ctx, server.URL, "chunk-unit")
+
+	hook, metricsCh := sources.NewUnitHook(ctx)
+	mgr := sources.NewManager(
+		sources.WithBufferedOutput(8),
+		sources.WithSourceUnits(),
+		sources.WithConcurrentUnits(2),
+		sources.WithReportHook(hook),
+	)
+
+	var chunks []*sources.Chunk
+	drained := make(chan struct{})
+	go func() {
+		defer close(drained)
+		for chunk := range mgr.Chunks() {
+			chunks = append(chunks, chunk)
+		}
+	}()
+
+	ref, err := mgr.EnumerateAndScan(ctx, "jenkins", s)
+	require.NoError(t, err)
+	<-ref.Done()
+	require.NoError(t, mgr.Wait(), "a failing job must not fail the scan")
+	<-drained
+
+	assert.Len(t, chunks, 2, "both builds of the healthy job are scanned")
+
+	errorsByUnit := make(map[string]int)
+	for metric := range metricsCh {
+		id, _ := metric.Unit.SourceUnitID()
+		errorsByUnit[id] = len(metric.Errors)
+	}
+	assert.Equal(t, map[string]int{"/job/good": 0, "/job/no-builds": 1}, errorsByUnit)
 }

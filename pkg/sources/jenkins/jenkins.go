@@ -48,11 +48,9 @@ type header struct {
 }
 
 // Ensure the Source satisfies the interfaces at compile time.
-// SourceUnitChunker is deliberately not implemented yet, which keeps
-// SourceManager on the non-unit Chunks path for scans.
 var (
 	_ sources.Source                 = (*Source)(nil)
-	_ sources.SourceUnitEnumerator   = (*Source)(nil)
+	_ sources.SourceUnitEnumChunker  = (*Source)(nil)
 	_ sources.SourceUnitUnmarshaller = (*Source)(nil)
 )
 
@@ -392,42 +390,20 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 	}
 	ctx.Logger().V(1).Info("got jobs", "count", len(jobs.Jobs))
 
+	reporter := sources.ChanReporter{Ch: chunksChan}
 	for i, project := range jobs.Jobs {
 		if common.IsDone(ctx) {
 			return nil
 		}
 
-		ctx := context.WithValues(ctx,
-			"job_name", project.Name,
-			"job_class", project.Class,
-			"job_url", project.Url)
-
 		s.SetProgressComplete(i, len(jobs.Jobs), fmt.Sprintf("Project: %s", project.Name), "")
 
-		// Path is derived from the job URL by the walk above.
-		projectURL := *s.url
-		projectURL.Path = project.Path
-
-		builds, err := s.GetJenkinsBuilds(ctx, projectURL.Path)
-		if err != nil {
-			ctx.Logger().Error(err, "failed to get builds; skipping job")
-			continue
-		}
-		ctx.Logger().V(2).Info("got builds",
-			"count", len(builds.Builds))
-
-		for _, build := range builds.Builds {
+		if err := s.scanJob(ctx, project, reporter); err != nil {
+			// Cancellation ends the scan quietly, as it always has here.
 			if common.IsDone(ctx) {
 				return nil
 			}
-
-			ctx := context.WithValues(ctx,
-				"build_number", build.Number,
-				"build_url", build.Url)
-
-			if err := s.chunkBuild(ctx, build, project.Name, chunksChan); err != nil {
-				ctx.Logger().Error(err, "error scanning build log")
-			}
+			return err
 		}
 	}
 
@@ -435,13 +411,65 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 	return nil
 }
 
-// chunkBuild takes build information and sends it to the chunksChan.
-// It also logs all errors that occur and does not return them, as the parent context expects to continue running.
+// scanJob scans the build logs of a single job. A failure to list the job's
+// builds or to fetch one build's log is sent to the reporter and the scan of
+// the job carries on where it can. It returns an error only when the context
+// is cancelled or the reporter returns one.
+func (s *Source) scanJob(ctx context.Context, job JenkinsJob, reporter sources.ChunkReporter) error {
+	ctx = context.WithValues(ctx,
+		"job_name", job.Name,
+		"job_class", job.Class,
+		"job_url", job.Url)
+
+	// Path is derived from the job URL by the walk, or is the unit ID.
+	builds, err := s.GetJenkinsBuilds(ctx, job.Path)
+	if err != nil {
+		// A request cut short by cancellation is not a fault of the job.
+		if common.IsDone(ctx) {
+			return ctx.Err()
+		}
+		return reporter.ChunkErr(ctx, fmt.Errorf("failed to get builds for job %q: %w", job.Path, err))
+	}
+	ctx.Logger().V(2).Info("got builds",
+		"count", len(builds.Builds))
+
+	// A unit rebuilt from its ID alone carries no name, so fall back to the
+	// name derived from its path.
+	projectName := job.Name
+	if projectName == "" {
+		projectName = job.Display()
+	}
+
+	for _, build := range builds.Builds {
+		if common.IsDone(ctx) {
+			return ctx.Err()
+		}
+
+		ctx := context.WithValues(ctx,
+			"build_number", build.Number,
+			"build_url", build.Url)
+
+		if err := s.chunkBuild(ctx, build, projectName, reporter); err != nil {
+			// A log fetch cut short by cancellation is not a fault of the job.
+			if common.IsDone(ctx) {
+				return ctx.Err()
+			}
+			if err := reporter.ChunkErr(ctx, fmt.Errorf("failed to scan build %d of job %q: %w", build.Number, job.Path, err)); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// chunkBuild fetches a build's console log and sends its chunks to the
+// reporter. Errors fetching the log are returned so the caller can attribute
+// them to the job being scanned.
 func (s *Source) chunkBuild(
 	ctx context.Context,
 	build JenkinsBuild,
 	projectName string,
-	chunksChan chan *sources.Chunk,
+	reporter sources.ChunkReporter,
 ) error {
 	ctx.Logger().V(3).Info("chunking build")
 
@@ -488,7 +516,7 @@ func (s *Source) chunkBuild(
 		SourceVerify: s.verify,
 	}
 
-	return handlers.HandleFile(ctx, resp.Body, chunkSkel, sources.ChanReporter{Ch: chunksChan})
+	return handlers.HandleFile(ctx, resp.Body, chunkSkel, reporter)
 }
 
 // Enumerate implements the SourceUnitEnumerator interface. It reports one unit
@@ -497,6 +525,17 @@ func (s *Source) chunkBuild(
 func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) error {
 	baseUrl := *s.url
 	return s.walkJobs(ctx, baseUrl.Path, reporter)
+}
+
+// ChunkUnit implements the SourceUnitChunker interface. It scans the build logs
+// of a single job, reporting any failure against that job's unit so the rest
+// of the scan carries on.
+func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporter sources.ChunkReporter) error {
+	job, ok := unit.(JenkinsJob)
+	if !ok {
+		return fmt.Errorf("unsupported unit type: %T", unit)
+	}
+	return s.scanJob(ctx, job, reporter)
 }
 
 // UnmarshalSourceUnit implements the SourceUnitUnmarshaller interface. It

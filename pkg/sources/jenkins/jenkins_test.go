@@ -257,7 +257,7 @@ func TestJenkinsChunkBuildDirect(t *testing.T) {
 
 	go func() {
 		defer close(chunksChan)
-		err := s.chunkBuild(ctx, mockBuild, "test-project", chunksChan)
+		err := s.chunkBuild(ctx, mockBuild, "test-project", sources.ChanReporter{Ch: chunksChan})
 		assert.NoError(t, err)
 	}()
 
