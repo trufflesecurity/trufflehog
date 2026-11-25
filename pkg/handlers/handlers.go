@@ -209,12 +209,15 @@ type FileHandler interface {
 }
 
 // fileHandlingConfig encapsulates configuration settings that control the behavior of file processing.
-type fileHandlingConfig struct{ skipArchives bool }
+type fileHandlingConfig struct {
+	skipArchives bool
+	drainSkipped bool
+}
 
 // newFileHandlingConfig creates a default fileHandlingConfig with default settings.
 // Optional functional parameters can customize the configuration.
 func newFileHandlingConfig(options ...func(*fileHandlingConfig)) fileHandlingConfig {
-	config := fileHandlingConfig{}
+	config := fileHandlingConfig{drainSkipped: true}
 	for _, option := range options {
 		option(&config)
 	}
@@ -226,6 +229,16 @@ func newFileHandlingConfig(options ...func(*fileHandlingConfig)) fileHandlingCon
 // If skip is true, the FileHandler will skip archive files.
 func WithSkipArchives(skip bool) func(*fileHandlingConfig) {
 	return func(c *fileHandlingConfig) { c.skipArchives = skip }
+}
+
+// WithDrainSkipped controls whether HandleFile reads a skipped file to the end
+// before returning. It defaults to true, which keeps a producer writing into a
+// pipe from blocking on a reader that stopped early. A caller whose reader can
+// be abandoned, such as an HTTP response body it closes after HandleFile
+// returns, passes false so a file skipped for its content type costs only the
+// bytes read to detect that type.
+func WithDrainSkipped(drain bool) func(*fileHandlingConfig) {
+	return func(c *fileHandlingConfig) { c.drainSkipped = drain }
 }
 
 type handlerType string
@@ -323,19 +336,19 @@ var skipArchiverMimeTypes = map[mimeType]struct{}{
 // - archiveHandler is used for common archive formats supported by the archiver library (.zip, .tar, .gz, etc.).
 // - defaultHandler is used for non-archive files.
 // The selected handler is then returned, ready to handle the file according to its specific format and requirements.
-func selectHandler(mimeT mimeType, isGenericArchive bool) FileHandler {
+func selectHandler(mimeT mimeType, isGenericArchive bool, opts ...defaultHandlerOption) FileHandler {
 	switch mimeT {
 	case arMime, unixArMime, debMime:
-		return newARHandler()
+		return newARHandler(opts...)
 	case rpmMime, cpioMime:
-		return newRPMHandler()
+		return newRPMHandler(opts...)
 	case apkMime:
-		return newAPKHandler()
+		return newAPKHandler(opts...)
 	default:
 		if isGenericArchive {
-			return newArchiveHandler()
+			return newArchiveHandler(opts...)
 		}
-		return newDefaultHandler(defaultHandlerType)
+		return newDefaultHandler(defaultHandlerType, opts...)
 	}
 }
 
@@ -401,7 +414,7 @@ func HandleFile(
 	processingCtx, cancel := logContext.WithTimeout(ctx, maxTimeout)
 	defer cancel()
 
-	handler := selectHandler(mimeT, rdr.isGenericArchive)
+	handler := selectHandler(mimeT, rdr.isGenericArchive, withDrainSkipped(config.drainSkipped))
 	dataOrErrChan := handler.HandleFile(processingCtx, rdr) // Delegate to the specific handler to process the file.
 
 	return handleChunksWithError(processingCtx, dataOrErrChan, chunkSkel, reporter)

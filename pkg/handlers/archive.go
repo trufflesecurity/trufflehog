@@ -40,8 +40,8 @@ func SetArchiveMaxTimeout(timeout time.Duration) { maxTimeout = timeout }
 // archiveHandler is a handler for common archive files that are supported by the archiver library.
 type archiveHandler struct{ *defaultHandler }
 
-func newArchiveHandler() *archiveHandler {
-	return &archiveHandler{defaultHandler: newDefaultHandler(archiveHandlerType)}
+func newArchiveHandler(opts ...defaultHandlerOption) *archiveHandler {
+	return &archiveHandler{defaultHandler: newDefaultHandler(archiveHandlerType, opts...)}
 }
 
 // HandleFile processes archive files and returns a channel of DataOrErr.

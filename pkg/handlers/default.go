@@ -19,8 +19,9 @@ import (
 // This allows the specialized handlers to focus on their specific archive formats while leveraging
 // the common functionality provided by the defaultHandler for processing the extracted content.
 type defaultHandler struct {
-	chunkReader sources.ChunkReader
-	metrics     *metrics
+	chunkReader  sources.ChunkReader
+	metrics      *metrics
+	drainSkipped bool
 }
 
 // defaultHandlerOption is a functional option for configuring a defaultHandler.
@@ -32,14 +33,20 @@ func withChunkReader(cr sources.ChunkReader) defaultHandlerOption {
 	return func(h *defaultHandler) { h.chunkReader = cr }
 }
 
+// withDrainSkipped carries WithDrainSkipped from HandleFile to the handler.
+func withDrainSkipped(drain bool) defaultHandlerOption {
+	return func(h *defaultHandler) { h.drainSkipped = drain }
+}
+
 // newDefaultHandler creates a defaultHandler with metrics configured based on the provided handlerType.
 // The handlerType parameter is used to initialize the metrics instance with the appropriate handler type,
 // ensuring that the metrics recorded within the defaultHandler methods are correctly attributed to the
 // specific handler that invoked them.
 func newDefaultHandler(handlerType handlerType, opts ...defaultHandlerOption) *defaultHandler {
 	h := &defaultHandler{
-		chunkReader: sources.NewChunkReader(),
-		metrics:     newHandlerMetrics(handlerType),
+		chunkReader:  sources.NewChunkReader(),
+		metrics:      newHandlerMetrics(handlerType),
+		drainSkipped: true,
 	}
 	for _, opt := range opts {
 		opt(h)
@@ -122,8 +129,11 @@ func (h *defaultHandler) handleNonArchiveContent(
 	if common.SkipFile(mimeExt) || common.IsBinary(mimeExt) {
 		ctx.Logger().V(4).Info("skipping file: extension is ignored", "ext", mimeExt)
 		h.metrics.incFilesSkipped()
-		// Make sure we consume the reader to avoid potentially blocking indefinitely.
-		_, _ = io.Copy(io.Discard, reader)
+		// Consume the rest of the reader so a producer writing into a pipe doesn't block indefinitely.
+		// Callers whose reader can be abandoned opt out with WithDrainSkipped(false).
+		if h.drainSkipped {
+			_, _ = io.Copy(io.Discard, reader)
+		}
 		return nil
 	}
 
