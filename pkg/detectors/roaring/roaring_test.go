@@ -37,6 +37,18 @@ func TestRoaring_Pattern(t *testing.T) {
 			input: fmt.Sprintf("%s token - '%s'\n%s token - '%s'\n", keyword, invalidClient, keyword, invalidSecret),
 			want:  []string{},
 		},
+		{
+			name: "pyroaring wheel entries in poetry.lock",
+			input: `[[package]]
+name = "pyroaring"
+version = "1.1.0"
+files = [
+    {file = "pyroaring-1.1.0-cp310-cp310-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:55c9d0b708a65308eaa95c53d9de56a2b4425812395f6e57a4d9ad8efb081bf9"},
+    {file = "pyroaring-1.1.0-cp311-cp311-macosx_14_0_universal2.whl", hash = "sha256:9cf8608c9d6cb6bff9c624744f7a2ba8ab12276f097a07930490fe0e2219e9be"},
+]
+`,
+			want: []string{},
+		},
 	}
 
 	for _, test := range tests {
