@@ -8,13 +8,11 @@ import (
 	"io"
 	"maps"
 	"net/http"
-	"net/url"
 	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detector_typepb"
 )
@@ -22,8 +20,7 @@ import (
 type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 	detectors.EndpointSetter
-	client                *http.Client
-	cloudEndpointDisabled bool
+	client *http.Client
 }
 
 // Ensure the Scanner satisfies the interface at compile time.
@@ -33,11 +30,6 @@ var (
 	_ detectors.CloudProvider      = (*Scanner)(nil)
 )
 
-func (s *Scanner) UseCloudEndpoint(enabled bool) {
-	s.EndpointSetter.UseCloudEndpoint(enabled)
-	s.cloudEndpointDisabled = !enabled
-}
-
 func (Scanner) CloudEndpoint() string { return "https://verify.twilio.com/v2/Services" }
 
 var (
@@ -45,14 +37,6 @@ var (
 	apiKeyPat     = regexp.MustCompile(`\bSK[a-zA-Z0-9]{32}\b`)
 	secretPat     = regexp.MustCompile(`\b[0-9a-zA-Z]{32}\b`)
 )
-
-type serviceResponse struct {
-	Services []struct {
-		FriendlyName string `json:"friendly_name"` // friendly name of a service
-		SID          string `json:"sid"`           // object id of service
-		AccountSID   string `json:"account_sid"`   // account sid
-	} `json:"services"`
-}
 
 func (s Scanner) getClient() *http.Client {
 	return s.VerificationClient(cmp.Or(s.client, defaultClient))
@@ -77,22 +61,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		uniqueSecrets[sec] = struct{}{}
 	}
 
-	endpoints := s.Endpoints()
-	if len(endpoints) == 0 && !s.cloudEndpointDisabled {
-		endpoints = []string{s.CloudEndpoint()}
-	}
-
-	var client *http.Client
-	if verify && len(endpoints) > 0 {
-		client = s.getClient()
-		for _, endpointURL := range endpoints {
-			if u, err := url.Parse(endpointURL); err == nil && strings.TrimRight(u.Path, "/") == "" {
-				logger := logContext.AddLogger(ctx).Logger().WithName("twilioapikey")
-				logger.Info(fmt.Sprintf("warning: custom verifier endpoint %s is missing a path portion; validating against root", u.Redacted()))
-			}
-		}
-	}
-
 	for apiKey := range uniqueAPIKeys {
 		for secret := range uniqueSecrets {
 			s1 := detectors.Result{
@@ -104,10 +72,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				SecretParts:  map[string]string{"key": apiKey, "secret": secret},
 			}
 
-			if verify && client != nil {
+			if verify {
 				var lastErr error
-				for _, endpointURL := range endpoints {
-					extraData, isVerified, verificationErr := verifyTwilioAPIKey(ctx, client, apiKey, secret, endpointURL)
+				for _, endpointURL := range s.Endpoints() {
+					extraData, isVerified, verificationErr := verifyTwilioAPIKey(ctx, s.getClient(), apiKey, secret, endpointURL)
 					s1.Verified = isVerified
 					if verificationErr != nil {
 						lastErr = verificationErr

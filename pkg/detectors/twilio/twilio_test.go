@@ -27,6 +27,13 @@ var (
 	keyword    = "twilio"
 )
 
+func newTestScanner(client *http.Client) Scanner {
+	s := Scanner{client: client}
+	s.SetCloudEndpoint(s.CloudEndpoint())
+	s.UseCloudEndpoint(true)
+	return s
+}
+
 func TestTwilio_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
@@ -149,7 +156,7 @@ func TestTwilio_VerificationDeterminacy(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			results, err := Scanner{client: test.client}.FromData(context.Background(), true, data)
+			results, err := newTestScanner(test.client).FromData(context.Background(), true, data)
 			if err != nil {
 				t.Fatalf("FromData() error = %v", err)
 			}
@@ -192,7 +199,7 @@ func TestTwilio_RetryExhaustionIsIndeterminate(t *testing.T) {
 	}
 
 	data := []byte(fmt.Sprintf("twilio sid %s key %s", validSid, validKey))
-	results, err := Scanner{client: retryClient.StandardClient()}.FromData(context.Background(), true, data)
+	results, err := newTestScanner(retryClient.StandardClient()).FromData(context.Background(), true, data)
 	if err != nil {
 		t.Fatalf("FromData() error = %v", err)
 	}
@@ -216,7 +223,7 @@ func TestTwilio_Verification_HappyPath_ActiveAccount(t *testing.T) {
 	mockBody := fmt.Sprintf(`{"sid":"%s","friendly_name":"Production Account","status":"active","type":"Full"}`, validSid)
 
 	client := common.ConstantResponseHttpClient(http.StatusOK, mockBody)
-	results, err := Scanner{client: client}.FromData(context.Background(), true, data)
+	results, err := newTestScanner(client).FromData(context.Background(), true, data)
 	if err != nil {
 		t.Fatalf("FromData() error = %v", err)
 	}
@@ -250,7 +257,7 @@ func TestTwilio_Verification_HappyPath_SuspendedAccount(t *testing.T) {
 	mockBody := fmt.Sprintf(`{"sid":"%s","friendly_name":"Old Sandbox","status":"suspended","type":"Full"}`, validSid)
 
 	client := common.ConstantResponseHttpClient(http.StatusOK, mockBody)
-	results, err := Scanner{client: client}.FromData(context.Background(), true, data)
+	results, err := newTestScanner(client).FromData(context.Background(), true, data)
 	if err != nil {
 		t.Fatalf("FromData() error = %v", err)
 	}
@@ -284,7 +291,7 @@ func TestTwilio_EndpointCustomization(t *testing.T) {
 			},
 		}
 
-		s := Scanner{client: client}
+		s := newTestScanner(client)
 		results, err := s.FromData(context.Background(), true, data)
 		if err != nil {
 			t.Fatalf("FromData() error = %v", err)
@@ -433,22 +440,82 @@ func TestTwilio_EndpointCustomization(t *testing.T) {
 		}
 	})
 
-	t.Run("subaccount identification when account SID is omitted in JSON response", func(t *testing.T) {
-		// If response omits 'sid' but has owner_account_sid == candidate sid, it must NOT be tagged as a subaccount
+	t.Run("omitted SID in 200 response returns verification error", func(t *testing.T) {
 		mockBody := fmt.Sprintf(`{"owner_account_sid":"%s","friendly_name":"Primary Account","status":"active"}`, validSid)
 		client := common.ConstantResponseHttpClient(http.StatusOK, mockBody)
 
-		s := Scanner{client: client}
+		s := newTestScanner(client)
 		results, err := s.FromData(context.Background(), true, data)
 		if err != nil {
 			t.Fatalf("FromData() error = %v", err)
 		}
-		if len(results) != 1 || !results[0].Verified {
-			t.Fatalf("expected verified result, got %+v", results)
+		if len(results) != 1 {
+			t.Fatalf("expected 1 result, got %d", len(results))
 		}
+		if results[0].Verified {
+			t.Errorf("Verified = true, want false when SID is omitted in 200 response")
+		}
+		if results[0].VerificationError() == nil {
+			t.Errorf("VerificationError() = nil, want error on omitted SID")
+		}
+	})
 
-		if results[0].ExtraData["is_subaccount"] == "true" {
-			t.Errorf("is_subaccount = 'true', want not true when owner_account_sid matches candidate sid")
+	t.Run("non-JSON 200 response returns verification error", func(t *testing.T) {
+		client := common.ConstantResponseHttpClient(http.StatusOK, "<html><body>Auth Proxy Portal</body></html>")
+
+		s := newTestScanner(client)
+		results, err := s.FromData(context.Background(), true, data)
+		if err != nil {
+			t.Fatalf("FromData() error = %v", err)
+		}
+		if len(results) != 1 {
+			t.Fatalf("expected 1 result, got %d", len(results))
+		}
+		if results[0].Verified {
+			t.Errorf("Verified = true, want false on non-JSON 200 response")
+		}
+		if results[0].VerificationError() == nil {
+			t.Errorf("VerificationError() = nil, want error on non-JSON 200 response")
+		}
+	})
+
+	t.Run("mismatched SID in 200 response returns verification error", func(t *testing.T) {
+		mockBody := `{"sid":"AC99999999999999999999999999999999","friendly_name":"Other Account","status":"active"}`
+		client := common.ConstantResponseHttpClient(http.StatusOK, mockBody)
+
+		s := newTestScanner(client)
+		results, err := s.FromData(context.Background(), true, data)
+		if err != nil {
+			t.Fatalf("FromData() error = %v", err)
+		}
+		if len(results) != 1 {
+			t.Fatalf("expected 1 result, got %d", len(results))
+		}
+		if results[0].Verified {
+			t.Errorf("Verified = true, want false on mismatched SID")
+		}
+		if results[0].VerificationError() == nil {
+			t.Errorf("VerificationError() = nil, want error on mismatched SID")
+		}
+	})
+
+	t.Run("non-AC prefix SID in 200 response returns verification error", func(t *testing.T) {
+		mockBody := fmt.Sprintf(`{"sid":"SK%s","friendly_name":"API Key Response","status":"active"}`, validSid[2:])
+		client := common.ConstantResponseHttpClient(http.StatusOK, mockBody)
+
+		s := newTestScanner(client)
+		results, err := s.FromData(context.Background(), true, data)
+		if err != nil {
+			t.Fatalf("FromData() error = %v", err)
+		}
+		if len(results) != 1 {
+			t.Fatalf("expected 1 result, got %d", len(results))
+		}
+		if results[0].Verified {
+			t.Errorf("Verified = true, want false on non-AC prefix SID")
+		}
+		if results[0].VerificationError() == nil {
+			t.Errorf("VerificationError() = nil, want error on non-AC prefix SID")
 		}
 	})
 
@@ -486,7 +553,7 @@ func TestTwilio_EndpointCustomization(t *testing.T) {
 		mockBody := fmt.Sprintf(`{"sid":"%s","friendly_name":"Closed Project","status":"closed","type":"Full"}`, validSid)
 		client := common.ConstantResponseHttpClient(http.StatusOK, mockBody)
 
-		s := Scanner{client: client}
+		s := newTestScanner(client)
 		results, err := s.FromData(context.Background(), true, data)
 		if err != nil {
 			t.Fatalf("FromData() error = %v", err)
@@ -511,7 +578,7 @@ func TestTwilio_Verification_ClosedAccount(t *testing.T) {
 	mockBody := fmt.Sprintf(`{"sid":"%s","friendly_name":"Closed Project","status":"closed","type":"Full"}`, validSid)
 
 	client := common.ConstantResponseHttpClient(http.StatusOK, mockBody)
-	results, err := Scanner{client: client}.FromData(context.Background(), true, data)
+	results, err := newTestScanner(client).FromData(context.Background(), true, data)
 	if err != nil {
 		t.Fatalf("FromData() error = %v", err)
 	}
@@ -554,7 +621,7 @@ func TestTwilio_Verification_ClosedAccount_CaseInsensitive(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockBody := fmt.Sprintf(`{"sid":"%s","status":"%s"}`, validSid, tt.statusJSON)
 			client := common.ConstantResponseHttpClient(http.StatusOK, mockBody)
-			results, err := Scanner{client: client}.FromData(context.Background(), true, data)
+			results, err := newTestScanner(client).FromData(context.Background(), true, data)
 			if err != nil {
 				t.Fatalf("FromData() error = %v", err)
 			}

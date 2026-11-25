@@ -11,13 +11,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/go-logr/zapr"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
-	"go.uber.org/zap/zaptest"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
@@ -29,6 +23,13 @@ var (
 	invalidSecret = "k6JXtY3WBtU$thisisfakeZDqVcjZxYI"
 	keyword       = "twilio"
 )
+
+func newTestScanner(client *http.Client) Scanner {
+	s := Scanner{client: client}
+	s.SetCloudEndpoint(s.CloudEndpoint())
+	s.UseCloudEndpoint(true)
+	return s
+}
 
 func TestTwilioAPIKey_Pattern(t *testing.T) {
 	d := Scanner{}
@@ -173,7 +174,7 @@ func TestTwilioAPIKey_VerificationDeterminacy(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			results, err := Scanner{client: test.client}.FromData(context.Background(), true, data)
+			results, err := newTestScanner(test.client).FromData(context.Background(), true, data)
 			if err != nil {
 				t.Fatalf("FromData() error = %v", err)
 			}
@@ -201,7 +202,7 @@ func TestTwilioAPIKey_Verification_HappyPath(t *testing.T) {
 	mockBody := `{"services":[{"friendly_name":"Production Service","sid":"VA123","account_sid":"AC123"}]}`
 
 	client := common.ConstantResponseHttpClient(http.StatusOK, mockBody)
-	results, err := Scanner{client: client}.FromData(context.Background(), true, data)
+	results, err := newTestScanner(client).FromData(context.Background(), true, data)
 	if err != nil {
 		t.Fatalf("FromData() error = %v", err)
 	}
@@ -247,7 +248,7 @@ func TestTwilioAPIKey_DefaultVerification_HitsFullURI(t *testing.T) {
 		},
 	}
 
-	s := Scanner{client: client}
+	s := newTestScanner(client)
 	results, err := s.FromData(context.Background(), true, data)
 	if err != nil {
 		t.Fatalf("FromData() error = %v", err)
@@ -330,7 +331,7 @@ func TestTwilioAPIKey_CustomEndpoint_CustomPathPreserved(t *testing.T) {
 	}
 }
 
-func TestTwilioAPIKey_CustomEndpoint_MissingPathEmitsWarningAndHitsRoot(t *testing.T) {
+func TestTwilioAPIKey_CustomEndpoint_MissingPathHitsRoot(t *testing.T) {
 	data := []byte(fmt.Sprintf("twilio %s %s", validAPIKey, validSecret))
 
 	var requestedURL string
@@ -346,20 +347,12 @@ func TestTwilioAPIKey_CustomEndpoint_MissingPathEmitsWarningAndHitsRoot(t *testi
 		},
 	}
 
-	var loggedMessages []string
-	logger := zapr.NewLogger(zaptest.NewLogger(t, zaptest.WrapOptions(zap.Hooks(func(e zapcore.Entry) error {
-		loggedMessages = append(loggedMessages, e.Message)
-		return nil
-	}))))
-
-	ctx := logContext.WithLogger(context.Background(), logger)
-
 	s := Scanner{client: client}
 	if err := s.SetConfiguredEndpoints("https://authproxy.corp.internal"); err != nil {
 		t.Fatalf("SetConfiguredEndpoints error = %v", err)
 	}
 
-	results, err := s.FromData(ctx, true, data)
+	results, err := s.FromData(context.Background(), true, data)
 	if err != nil {
 		t.Fatalf("FromData() error = %v", err)
 	}
@@ -369,17 +362,6 @@ func TestTwilioAPIKey_CustomEndpoint_MissingPathEmitsWarningAndHitsRoot(t *testi
 
 	if requestedURL != "https://authproxy.corp.internal" && requestedURL != "https://authproxy.corp.internal/" {
 		t.Errorf("requestedURL = %q, want https://authproxy.corp.internal or https://authproxy.corp.internal/", requestedURL)
-	}
-
-	var foundWarning bool
-	for _, msg := range loggedMessages {
-		if strings.Contains(msg, "missing a path portion") {
-			foundWarning = true
-			break
-		}
-	}
-	if !foundWarning {
-		t.Errorf("expected log containing 'missing a path portion', got: %v", loggedMessages)
 	}
 }
 
@@ -400,7 +382,7 @@ func TestTwilioAPIKey_EndpointCustomization(t *testing.T) {
 			},
 		}
 
-		s := Scanner{client: client}
+		s := newTestScanner(client)
 		results, err := s.FromData(context.Background(), true, data)
 		if err != nil {
 			t.Fatalf("FromData() error = %v", err)
@@ -606,7 +588,7 @@ func TestTwilioAPIKey_EndpointCustomization(t *testing.T) {
 			},
 		}
 
-		s := Scanner{client: client}
+		s := newTestScanner(client)
 		results, err := s.FromData(context.Background(), true, data)
 		if err != nil {
 			t.Fatalf("FromData() error = %v", err)
@@ -651,15 +633,7 @@ func TestTwilioAPIKey_EndpointCustomization(t *testing.T) {
 		}
 	})
 
-	t.Run("userinfo password is redacted in warning log", func(t *testing.T) {
-		var loggedMessages []string
-		logger := zapr.NewLogger(zaptest.NewLogger(t, zaptest.WrapOptions(zap.Hooks(func(e zapcore.Entry) error {
-			loggedMessages = append(loggedMessages, e.Message)
-			return nil
-		}))))
-
-		ctx := logContext.WithLogger(context.Background(), logger)
-
+	t.Run("custom endpoint with userinfo verifies without error", func(t *testing.T) {
 		client := &http.Client{
 			Transport: common.FakeTransport{
 				CreateResponse: func(req *http.Request) (*http.Response, error) {
@@ -676,25 +650,12 @@ func TestTwilioAPIKey_EndpointCustomization(t *testing.T) {
 			t.Fatalf("SetConfiguredEndpoints error = %v", err)
 		}
 
-		results, err := s.FromData(ctx, true, data)
+		results, err := s.FromData(context.Background(), true, data)
 		if err != nil {
 			t.Fatalf("FromData() error = %v", err)
 		}
 		if len(results) != 1 || !results[0].Verified {
 			t.Fatalf("expected verified result, got %+v", results)
-		}
-
-		var foundRedacted bool
-		for _, msg := range loggedMessages {
-			if strings.Contains(msg, "secret123") {
-				t.Fatalf("found unredacted secret in log message: %q", msg)
-			}
-			if strings.Contains(msg, "xxxxx") {
-				foundRedacted = true
-			}
-		}
-		if !foundRedacted {
-			t.Errorf("expected log message with redacted userinfo, got: %v", loggedMessages)
 		}
 	})
 

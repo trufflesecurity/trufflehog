@@ -20,8 +20,7 @@ import (
 type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 	detectors.EndpointSetter
-	client                *http.Client
-	cloudEndpointDisabled bool
+	client *http.Client
 }
 
 // Ensure the Scanner satisfies the interface at compile time.
@@ -30,11 +29,6 @@ var (
 	_ detectors.EndpointCustomizer = (*Scanner)(nil)
 	_ detectors.CloudProvider      = (*Scanner)(nil)
 )
-
-func (s *Scanner) UseCloudEndpoint(enabled bool) {
-	s.EndpointSetter.UseCloudEndpoint(enabled)
-	s.cloudEndpointDisabled = !enabled
-}
 
 func (Scanner) CloudEndpoint() string { return "https://api.twilio.com" }
 
@@ -75,16 +69,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		uniqueSIDs[s] = struct{}{}
 	}
 
-	endpoints := s.Endpoints()
-	if len(endpoints) == 0 && !s.cloudEndpointDisabled {
-		endpoints = []string{s.CloudEndpoint()}
-	}
-
-	var client *http.Client
-	if verify && len(endpoints) > 0 {
-		client = s.getClient()
-	}
-
 	for sid := range uniqueSIDs {
 		for key := range uniqueKeys {
 			s1 := detectors.Result{
@@ -99,10 +83,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				"rotation_guide": "https://howtorotate.com/docs/tutorials/twilio/",
 			}
 
-			if verify && client != nil {
+			if verify {
 				var lastErr error
-				for _, baseURL := range endpoints {
-					extraData, isVerified, verificationErr := verifyTwilio(ctx, client, key, sid, baseURL)
+				for _, baseURL := range s.Endpoints() {
+					extraData, isVerified, verificationErr := verifyTwilio(ctx, s.getClient(), key, sid, baseURL)
 					s1.Verified = isVerified
 					if verificationErr != nil {
 						lastErr = verificationErr
@@ -165,25 +149,29 @@ func verifyTwilio(ctx context.Context, client *http.Client, key, sid, baseURL st
 
 	switch resp.StatusCode {
 	case http.StatusOK:
-		extraData := make(map[string]string)
 		var account accountResponse
+		if err := json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&account); err != nil {
+			return nil, false, fmt.Errorf("unexpected response payload from verifier endpoint: %w", err)
+		}
 
-		if err := json.NewDecoder(resp.Body).Decode(&account); err == nil {
-			resolvedSID := cmp.Or(account.SID, sid)
-			extraData["account_sid"] = resolvedSID
-			if account.FriendlyName != "" {
-				extraData["friendly_name"] = account.FriendlyName
-			}
-			if account.Status != "" {
-				extraData["status"] = account.Status
-			}
-			if account.Type != "" {
-				extraData["type"] = account.Type
-			}
-			if account.OwnerAccountSID != "" && account.OwnerAccountSID != resolvedSID {
-				extraData["owner_account_sid"] = account.OwnerAccountSID
-				extraData["is_subaccount"] = "true"
-			}
+		if account.SID == "" || !strings.HasPrefix(account.SID, "AC") || account.SID != sid {
+			return nil, false, fmt.Errorf("unexpected response payload from verifier endpoint: SID mismatch or invalid")
+		}
+
+		extraData := make(map[string]string)
+		extraData["account_sid"] = account.SID
+		if account.FriendlyName != "" {
+			extraData["friendly_name"] = account.FriendlyName
+		}
+		if account.Status != "" {
+			extraData["status"] = account.Status
+		}
+		if account.Type != "" {
+			extraData["type"] = account.Type
+		}
+		if account.OwnerAccountSID != "" && account.OwnerAccountSID != account.SID {
+			extraData["owner_account_sid"] = account.OwnerAccountSID
+			extraData["is_subaccount"] = "true"
 		}
 
 		if strings.EqualFold(extraData["status"], "closed") {
