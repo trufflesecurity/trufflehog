@@ -24,7 +24,8 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"box"}) + `\b([0-9a-zA-Z]{32})\b`)
+	// Allow a camelCase boundary before Box without matching words such as icebox or dropbox.
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{`(?:^|[^[:alnum:]])box`, `(?-i:[a-z]Box)`}) + `\b([0-9a-zA-Z]{32})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
