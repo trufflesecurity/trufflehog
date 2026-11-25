@@ -615,6 +615,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/posthog"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/postman"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/postmark"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/postonce"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/powrbot"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/prefect"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/privacy"
@@ -1546,6 +1547,7 @@ func buildDetectorList() []detectors.Detector {
 		&posthog.Scanner{},
 		&postman.Scanner{},
 		&postmark.Scanner{},
+		&postonce.Scanner{},
 		&powrbot.Scanner{},
 		&prefect.Scanner{},
 		&privacy.Scanner{},
@@ -1934,6 +1936,8 @@ func buildDetectorList() []detectors.Detector {
 			return !feature.ServalDetectorEnabled.Load()
 		case *basetenv1.Scanner, *basetenv2.Scanner:
 			return !feature.BasetenDetectorEnabled.Load()
+		case *postonce.Scanner:
+			return !feature.PostOnceDetectorEnabled.Load()
 		default:
 			return false
 		}

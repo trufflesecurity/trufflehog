@@ -610,6 +610,7 @@ func run(state overseer.State, logSync func() error) {
 	feature.InfisicalDetectorEnabled.Store(true)
 	feature.ServalDetectorEnabled.Store(true)
 	feature.BasetenDetectorEnabled.Store(true)
+	feature.PostOnceDetectorEnabled.Store(true)
 
 	conf := &config.Config{}
 	if *configFilename != "" {
