@@ -83,7 +83,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		key := cleanInput(match)
 
 		creds := gcpKey{}
-		if err := json.NewDecoder(strings.NewReader(key)).Decode(&creds); err != nil {
+		// Validate the entire match; a decoder can accept a leading {} and ignore trailing code.
+		if err := json.Unmarshal([]byte(key), &creds); err != nil {
+			continue
+		}
+		if creds.PrivateKey == "" {
 			continue
 		}
 
