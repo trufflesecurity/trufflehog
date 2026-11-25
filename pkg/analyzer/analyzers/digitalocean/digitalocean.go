@@ -161,7 +161,6 @@ func checkPermissions(cfg *config.Config, key string) ([]string, error) {
 		mu          sync.Mutex
 		wg          sync.WaitGroup
 		slots       = make(chan struct{}, MAX_CONCURRENT_TESTS)
-		errCh       = make(chan error, 1)
 	)
 
 	for _, scope := range scopes {
@@ -175,11 +174,7 @@ func checkPermissions(cfg *config.Config, key string) ([]string, error) {
 
 			status, err := scope.HttpTest.RunTest(cfg, map[string]string{"Authorization": "Bearer " + key})
 			if err != nil {
-				// send first error and ignore the rest
-				select {
-				case errCh <- fmt.Errorf("Scope %s: %w", scope.Name, err):
-				default:
-				}
+				// unexpected status code means the scope is inaccessible; skip it
 				return
 			}
 			if status {
@@ -190,15 +185,7 @@ func checkPermissions(cfg *config.Config, key string) ([]string, error) {
 		}(scope)
 	}
 
-	// wait for all goroutines to finish or an error to occur
-	go func() {
-		wg.Wait()
-		close(errCh)
-	}()
-
-	if err := <-errCh; err != nil {
-		return nil, err
-	}
+	wg.Wait()
 
 	return permissions, nil
 }
