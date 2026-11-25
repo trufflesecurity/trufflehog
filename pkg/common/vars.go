@@ -108,13 +108,16 @@ var (
 		"vxd":    {}, // Virtual device driver in Windows
 		"sfx":    {}, // Self-extracting archive
 		"bundle": {}, // Mac OS X application bundle
-		"pyo":    {}, // Compiled Python file
-		"pyc":    {}, // Compiled Python file
-		"sym":    {}, // Symbolic link, Unix/Linux
-		"rlib":   {}, // Rust library
-		"pth":    {}, // Pytorch serialized model
-		"pbix":   {}, // Power BI report file
-		"pbit":   {}, // Power BI template file
+		// NOTE: "pyc" and "pyo" (Python bytecode) are intentionally absent.
+		// Secrets are stored as plaintext strings in marshal output, so
+		// bytecode is scanned rather than skipped; pkg/handlers reorders the
+		// embedded strings for keyword-prefixed detectors. See
+		// https://github.com/trufflesecurity/trufflehog/issues/5430.
+		"sym":  {}, // Symbolic link, Unix/Linux
+		"rlib": {}, // Rust library
+		"pth":  {}, // Pytorch serialized model
+		"pbix": {}, // Power BI report file
+		"pbit": {}, // Power BI template file
 	}
 )
 
