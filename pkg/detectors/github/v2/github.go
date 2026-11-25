@@ -22,6 +22,11 @@ var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.Versioner = (*Scanner)(nil)
 var _ detectors.EndpointCustomizer = (*Scanner)(nil)
 var _ detectors.CloudProvider = (*Scanner)(nil)
+var _ detectors.MaxSecretSizeProvider = (*Scanner)(nil)
+
+// MaxSecretSize accommodates stateless ghs_ installation tokens (~520 chars),
+// which exceed the engine's default 512-byte scan window.
+func (Scanner) MaxSecretSize() int64 { return 1024 }
 
 func (s Scanner) Version() int {
 	return 2
@@ -34,7 +39,7 @@ var (
 	// Token type list:
 	// https://github.blog/2021-04-05-behind-githubs-new-authentication-token-formats/
 	// https://github.blog/changelog/2022-10-18-introducing-fine-grained-personal-access-tokens/
-	keyPat = regexp.MustCompile(`\b((?:ghp|gho|ghu|ghs|ghr|github_pat)_[a-zA-Z0-9_]{36,255})\b`)
+	keyPat = regexp.MustCompile(`\b(ghs_[0-9]+_eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+|(?:ghp|gho|ghu|ghs|ghr|github_pat)_[a-zA-Z0-9_]{36,255})\b`)
 
 	// TODO: Oauth2 client_id and client_secret
 	// https://developer.github.com/v3/#oauth2-keysecret
