@@ -2,6 +2,10 @@ package circleci
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"sync"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -30,6 +34,8 @@ var (
 	`
 	secret = "4a4fFEA0Cb7760ee42Bb1Dc82b1E4E5eDCacB9E7"
 )
+
+var _ detectors.EndpointCustomizer = (*Scanner)(nil)
 
 func TestCircleCI_Pattern(t *testing.T) {
 	d := Scanner{}
@@ -87,5 +93,187 @@ func TestCircleCI_Pattern(t *testing.T) {
 				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
 			}
 		})
+	}
+}
+
+func TestCircleCI_VerifiesAgainstConfiguredEndpoint(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v2/me" {
+			t.Errorf("path = %q, want /api/v2/me", r.URL.Path)
+		}
+		if got := r.Header.Get("Circle-Token"); got != secret {
+			t.Errorf("Circle-Token = %q, want %q", got, secret)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	d := Scanner{client: server.Client()}
+	if err := d.SetConfiguredEndpoints(server.URL); err != nil {
+		t.Fatalf("SetConfiguredEndpoints() error = %v", err)
+	}
+	d.UseCloudEndpoint(false)
+
+	results, err := d.FromData(context.Background(), true, []byte(validPattern))
+	if err != nil {
+		t.Fatalf("FromData() error = %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("len(results) = %d, want 1", len(results))
+	}
+	if !results[0].Verified {
+		t.Fatalf("Verified = false, want true")
+	}
+	if err := results[0].VerificationError(); err != nil {
+		t.Fatalf("VerificationError() = %v, want nil", err)
+	}
+}
+
+func TestCircleCI_Unauthorized(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer server.Close()
+
+	d := Scanner{client: server.Client()}
+	if err := d.SetConfiguredEndpoints(server.URL); err != nil {
+		t.Fatalf("SetConfiguredEndpoints() error = %v", err)
+	}
+	d.UseCloudEndpoint(false)
+
+	results, err := d.FromData(context.Background(), true, []byte(validPattern))
+	if err != nil {
+		t.Fatalf("FromData() error = %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("len(results) = %d, want 1", len(results))
+	}
+	if results[0].Verified {
+		t.Fatalf("Verified = true, want false")
+	}
+	if err := results[0].VerificationError(); err != nil {
+		t.Fatalf("VerificationError() = %v, want nil", err)
+	}
+}
+
+func TestCircleCI_VerifiesAgainstLaterConfiguredEndpoint(t *testing.T) {
+	errorServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer errorServer.Close()
+
+	verifiedServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer verifiedServer.Close()
+
+	d := Scanner{client: verifiedServer.Client()}
+	if err := d.SetConfiguredEndpoints(errorServer.URL, verifiedServer.URL); err != nil {
+		t.Fatalf("SetConfiguredEndpoints() error = %v", err)
+	}
+	d.UseCloudEndpoint(false)
+
+	results, err := d.FromData(context.Background(), true, []byte(validPattern))
+	if err != nil {
+		t.Fatalf("FromData() error = %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("len(results) = %d, want 1", len(results))
+	}
+	if !results[0].Verified {
+		t.Fatalf("Verified = false, want true")
+	}
+	if err := results[0].VerificationError(); err != nil {
+		t.Fatalf("VerificationError() = %v, want nil", err)
+	}
+}
+
+func TestCircleCI_PreservesEndpointErrorWhenLaterEndpointUnauthorized(t *testing.T) {
+	errorServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer errorServer.Close()
+
+	unauthorizedServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer unauthorizedServer.Close()
+
+	d := Scanner{client: unauthorizedServer.Client()}
+	if err := d.SetConfiguredEndpoints(errorServer.URL, unauthorizedServer.URL); err != nil {
+		t.Fatalf("SetConfiguredEndpoints() error = %v", err)
+	}
+	d.UseCloudEndpoint(false)
+
+	results, err := d.FromData(context.Background(), true, []byte(validPattern))
+	if err != nil {
+		t.Fatalf("FromData() error = %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("len(results) = %d, want 1", len(results))
+	}
+	if results[0].Verified {
+		t.Fatalf("Verified = true, want false")
+	}
+	verificationErr := results[0].VerificationError()
+	if verificationErr == nil {
+		t.Fatalf("VerificationError() = nil, want endpoint error")
+	}
+	if !strings.Contains(verificationErr.Error(), "unexpected status code: 500") {
+		t.Fatalf("VerificationError() = %v, want status code 500 error", verificationErr)
+	}
+}
+
+func TestCircleCI_DefaultsToCloudEndpoint(t *testing.T) {
+	if got := (Scanner{}).CloudEndpoint(); got != "https://circleci.com" {
+		t.Fatalf("CloudEndpoint() = %q, want https://circleci.com", got)
+	}
+}
+
+func TestCircleCI_ConfiguredEndpointIsAdditiveToCloudEndpoint(t *testing.T) {
+	var (
+		mu   sync.Mutex
+		hits []string
+	)
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		hits = append(hits, r.URL.Path)
+		mu.Unlock()
+		switch r.URL.Path {
+		case "/configured/api/v2/me":
+			w.WriteHeader(http.StatusUnauthorized)
+		case "/cloud/api/v2/me":
+			w.WriteHeader(http.StatusOK)
+		default:
+			t.Errorf("unexpected path %q", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	// Mirror the engine defaults: the cloud endpoint stays enabled when --verifier adds a configured endpoint.
+	d := Scanner{client: server.Client()}
+	d.SetCloudEndpoint(server.URL + "/cloud")
+	d.UseCloudEndpoint(true)
+	if err := d.SetConfiguredEndpoints(server.URL + "/configured"); err != nil {
+		t.Fatalf("SetConfiguredEndpoints() error = %v", err)
+	}
+
+	results, err := d.FromData(context.Background(), true, []byte(validPattern))
+	if err != nil {
+		t.Fatalf("FromData() error = %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("len(results) = %d, want 1", len(results))
+	}
+	if !results[0].Verified {
+		t.Fatalf("Verified = false, want true (the cloud endpoint should still be tried)")
+	}
+	if err := results[0].VerificationError(); err != nil {
+		t.Fatalf("VerificationError() = %v, want nil", err)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if diff := cmp.Diff([]string{"/configured/api/v2/me", "/cloud/api/v2/me"}, hits); diff != "" {
+		t.Fatalf("requests (-want +got):\n%s", diff)
 	}
 }
