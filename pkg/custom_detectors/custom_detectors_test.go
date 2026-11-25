@@ -389,6 +389,60 @@ func TestDetectorSecretParts(t *testing.T) {
 	})
 }
 
+func TestDetectorExcludeWords(t *testing.T) {
+	tests := []struct {
+		name         string
+		excludeWords []string
+		data         string
+		wantRaw      []string
+	}{
+		{
+			name:         "lowercase word excludes mixed case secret",
+			excludeWords: []string{"example"},
+			data:         `token="AKIAIOSFODNN7EXAMPLE"`,
+			wantRaw:      nil,
+		},
+		{
+			name:         "uppercase word excludes uppercase secret",
+			excludeWords: []string{"EXAMPLE"},
+			data:         `token="AKIAIOSFODNN7EXAMPLE"`,
+			wantRaw:      nil,
+		},
+		{
+			name:         "mixed case word excludes lowercase secret",
+			excludeWords: []string{"ChangeMe"},
+			data:         `token="please-changeme-now"`,
+			wantRaw:      nil,
+		},
+		{
+			name:         "word not in secret keeps result",
+			excludeWords: []string{"EXAMPLE"},
+			data:         `token="AKIAQ3EGUZ5XJ4DK7BTW"`,
+			wantRaw:      []string{"AKIAQ3EGUZ5XJ4DK7BTW"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			detector, err := NewWebhookCustomRegex(&custom_detectorspb.CustomRegex{
+				Name:         "test",
+				Keywords:     []string{"token"},
+				Regex:        map[string]string{"token": `token="([^"]+)"`},
+				ExcludeWords: tt.excludeWords,
+			})
+			require.NoError(t, err)
+			results, err := detector.FromData(context.Background(), false, []byte(tt.data))
+			require.NoError(t, err)
+
+			var gotRaw []string
+			for _, r := range results {
+				gotRaw = append(gotRaw, string(r.Raw))
+			}
+			assert.Equal(t, tt.wantRaw, gotRaw)
+		})
+	}
+}
+
 func TestDetectorValidations(t *testing.T) {
 	type args struct {
 		CustomRegex *custom_detectorspb.CustomRegex
