@@ -2,6 +2,7 @@ package documo
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -11,6 +12,7 @@ import (
 )
 
 var (
+	secret = "ey" + strings.Repeat("A", 34) + ".ey" + strings.Repeat("B", 154) + "." + strings.Repeat("C", 43)
 	validPattern = `
 		# Documo Configuration File: config.yaml
 		database:
@@ -23,7 +25,7 @@ var (
 			auth_type: "Basic"
 			in: "Path"
 			api_version: v1
-			secret: "eyS9YqgD6TgdQ943G8S3aaiz26m2fTN9rcPbpeyts0jBEFd43hEFfr9pC7voqvLsbEi7Px4TbMToCVrstQRe8r2kltKGWyChYCT1Iruo6p3g3PyqZaZ1gOSbjeXz8zARUHZkXo7XR86kape65HLXj59yCNIlW5bvebJYbIAjjgGAAmXVgzldvNv8Zs08KIS5y62QJSNcnipFQbnxA8z6TUMl0F600MJhqEILWo19GaGjw"
+			secret: "` + secret + `"
 			base_url: "https://api.example.com/$api_version/example"
 			response_code: 200
 
@@ -31,7 +33,6 @@ var (
 		# - Remember to rotate the secret every 90 days.
 		# - The above credentials should only be used in a secure environment.
 	`
-	secret = "eyS9YqgD6TgdQ943G8S3aaiz26m2fTN9rcPbpeyts0jBEFd43hEFfr9pC7voqvLsbEi7Px4TbMToCVrstQRe8r2kltKGWyChYCT1Iruo6p3g3PyqZaZ1gOSbjeXz8zARUHZkXo7XR86kape65HLXj59yCNIlW5bvebJYbIAjjgGAAmXVgzldvNv8Zs08KIS5y62QJSNcnipFQbnxA8z6TUMl0F600MJhqEILWo19GaGjw"
 )
 
 func TestDocumo_Pattern(t *testing.T) {
