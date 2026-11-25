@@ -27,6 +27,12 @@ var (
 	secretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"plaid"}) + `\b([a-f0-9]{30})\b`)
 	idPat     = regexp.MustCompile(detectors.PrefixRegex([]string{"plaid"}) + `\b([a-f0-9]{24})\b`)
 	tokenPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"plaid"}) + `\b(access-(sandbox|production)-[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})\b`)
+
+	// Labeled values. This detector runs only when "plaid" is inside the 1024-byte
+	// keyword span, so these do not repeat the 40-character prefix. In request
+	// bodies the label is a few characters from the hex, while "plaid" is farther away.
+	labeledSecretPat = regexp.MustCompile(`(?i)\bsecret\b[^a-f0-9]{0,20}([a-f0-9]{30})\b`)
+	labeledIDPat     = regexp.MustCompile(`(?i)\bclient_id\b[^a-f0-9]{0,20}([a-f0-9]{24})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -42,32 +48,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	// find all the matching keys and ids in the data and make a unique maps for both.
 	uniqueSecrets, uniqueIds, uniqueTokens := make(map[string]struct{}), make(map[string]struct{}), make(map[string]struct{})
 
-	for _, foundKey := range secretPat.FindAllStringSubmatch(dataStr, -1) {
-		key := foundKey[1]
-		if detectors.StringShannonEntropy(key) < 3 {
-			continue
-		}
-
-		uniqueSecrets[key] = struct{}{}
-	}
-
-	for _, foundId := range idPat.FindAllStringSubmatch(dataStr, -1) {
-		id := foundId[1]
-		if detectors.StringShannonEntropy(id) < 3 {
-			continue
-		}
-
-		uniqueIds[id] = struct{}{}
-	}
-
-	for _, foundToken := range tokenPat.FindAllStringSubmatch(dataStr, -1) {
-		token := foundToken[1]
-		if detectors.StringShannonEntropy(token) < 3 {
-			continue
-		}
-
-		uniqueTokens[token] = struct{}{}
-	}
+	collectMatches(uniqueSecrets, dataStr, secretPat, labeledSecretPat)
+	collectMatches(uniqueIds, dataStr, idPat, labeledIDPat)
+	collectMatches(uniqueTokens, dataStr, tokenPat)
 
 	for secret := range uniqueSecrets {
 		for id := range uniqueIds {
@@ -95,10 +78,39 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 				results = append(results, s1)
 			}
+
+			// No access token was found. Report the client id and secret on their own.
+			// /item/get needs the token, so this result is not verified.
+			if len(uniqueTokens) == 0 {
+				results = append(results, detectors.Result{
+					DetectorType: detector_typepb.DetectorType_PlaidKey,
+					Raw:          []byte(secret),
+					RawV2:        []byte(fmt.Sprintf("%s:%s", secret, id)),
+					SecretParts: map[string]string{
+						"secret": secret,
+						"id":     id,
+					},
+				})
+			}
 		}
 	}
 
 	return
+}
+
+func collectMatches(dst map[string]struct{}, data string, pats ...*regexp.Regexp) {
+	for _, pat := range pats {
+		for _, match := range pat.FindAllStringSubmatch(data, -1) {
+			if len(match) < 2 {
+				continue
+			}
+			value := match[1]
+			if detectors.StringShannonEntropy(value) < 3 {
+				continue
+			}
+			dst[value] = struct{}{}
+		}
+	}
 }
 
 func verifyMatch(ctx context.Context, client *http.Client, id string, secret string, token string, env string) (bool, map[string]string, error) {
