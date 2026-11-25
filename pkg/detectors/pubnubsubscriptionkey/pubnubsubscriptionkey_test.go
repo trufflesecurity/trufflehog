@@ -3,6 +3,8 @@ package pubnubsubscriptionkey
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -16,6 +18,75 @@ var (
 	invalidPattern = "sub-c-sy4te40h-w1oc-z?yq-zlrw-w6ehv0y0y78c"
 	keyword        = "pubnubsubscriptionkey"
 )
+
+// TestPubNubSubscriptionKey_VerifyKey tests the 403 body-parsing logic that
+// determines whether a key is valid even when the Objects/App Context feature
+// is disabled on the PubNub account.
+func TestPubNubSubscriptionKey_VerifyKey(t *testing.T) {
+	tests := []struct {
+		name           string
+		statusCode     int
+		responseBody   string
+		wantVerified   bool
+		wantErrPresent bool
+	}{
+		{
+			name:         "200 OK - key is valid",
+			statusCode:   http.StatusOK,
+			responseBody: `{"status":200,"data":[]}`,
+			wantVerified: true,
+		},
+		{
+			name:         "403 with 'Objects not enabled' - key is valid, feature disabled",
+			statusCode:   http.StatusForbidden,
+			responseBody: `{"status":403,"error":true,"message":"Objects not enabled for this subscriber key."}`,
+			wantVerified: true,
+		},
+		{
+			name:         "403 with 'App Context is not enabled' - key is valid, feature disabled",
+			statusCode:   http.StatusForbidden,
+			responseBody: `{"status":403,"error":true,"message":"App Context is not enabled for this subscribe key."}`,
+			wantVerified: true,
+		},
+		{
+			name:         "403 with other body - key is invalid",
+			statusCode:   http.StatusForbidden,
+			responseBody: `{"status":403,"error":true,"message":"Invalid subscribe key"}`,
+			wantVerified: false,
+		},
+		{
+			name:         "401 Unauthorized - key is invalid",
+			statusCode:   http.StatusUnauthorized,
+			responseBody: `{"status":401,"error":true}`,
+			wantVerified: false,
+		},
+		{
+			name:           "unexpected status code - returns error",
+			statusCode:     http.StatusInternalServerError,
+			responseBody:   `internal error`,
+			wantVerified:   false,
+			wantErrPresent: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(test.statusCode)
+				_, _ = w.Write([]byte(test.responseBody))
+			}))
+			defer srv.Close()
+
+			verified, err := verifyKey(context.Background(), srv.Client(), srv.URL, "test-key")
+			if (err != nil) != test.wantErrPresent {
+				t.Errorf("wantErr=%v, got err=%v", test.wantErrPresent, err)
+			}
+			if verified != test.wantVerified {
+				t.Errorf("wantVerified=%v, got=%v", test.wantVerified, verified)
+			}
+		})
+	}
+}
 
 func TestPubNubSubscriptionKey_Pattern(t *testing.T) {
 	d := Scanner{}
