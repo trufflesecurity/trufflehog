@@ -118,7 +118,7 @@ require (
 	gopkg.in/h2non/gock.v1 v1.1.2
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1
-	pault.ag/go/debian v0.21.3
+	pault.ag/go/debian v0.21.4
 	pgregory.net/rapid v1.2.0
 	sigs.k8s.io/yaml v1.4.0
 )
@@ -229,7 +229,6 @@ require (
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
 	github.com/jpillora/s3 v1.1.4 // indirect
 	github.com/kevinburke/ssh_config v1.2.0 // indirect
-	github.com/kjk/lzma v0.0.0-20161016003348-3fd93898850d // indirect
 	github.com/lestrrat-go/blackmagic v1.0.4 // indirect
 	github.com/lestrrat-go/httpcc v1.0.1 // indirect
 	github.com/lestrrat-go/httprc/v3 v3.0.1 // indirect
