@@ -40,6 +40,11 @@ func TestAzureAppConfigConnectionString_Pattern(t *testing.T) {
 			want: []string{"Endpoint=https://iTHzRfnepCddRiYoBbPj-drVzUjwTNduwb3EUOTsuSAgg1e83Q7bw.azconfig.io;Id=eO04L+/m9rYn;Secret=G4jQ3GmcsYqlLkkG8uoIVbx08PZIJSdfB/7"},
 		},
 		{
+			name:  "valid pattern - canonical Azure format with hyphenated prefix and colon",
+			input: `Endpoint=https://myappconfig001.azconfig.io;Id=aB1c-d2-e3:+XyZ12345AbCdEfGhIjKl;Secret=MnOpQrSt67UvWxYz89AbCdEf0123GhIjKlMnOpQrStUvWxYz1234=`,
+			want:  []string{"Endpoint=https://myappconfig001.azconfig.io;Id=aB1c-d2-e3:+XyZ12345AbCdEfGhIjKl;Secret=MnOpQrSt67UvWxYz89AbCdEf0123GhIjKlMnOpQrStUvWxYz1234="},
+		},
+		{
 			name:  "invalid pattern",
 			input: `Endpoint=https://trufflesecurity.azconfig.io;Secret=80DtxZkndXpMTmV2J3JjX2vL1x4gm1hHn8Y3KeFV4N0PPLSO5D70JQQJ79BBAC1i4FpRkb5wAAACAAZC26dr`,
 			want:  nil,
