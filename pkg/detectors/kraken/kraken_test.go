@@ -3,7 +3,6 @@ package kraken
 import (
 	"context"
 	"fmt"
-	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -13,11 +12,12 @@ import (
 )
 
 var (
-	validKeyPattern       = "m=MN/0yYJ/5xqpE15JYDJtCFdDF7RDLuiXtTiSF1FU1H9waiub1kgwI= "
-	invalidKeyPattern     = "m=MN/0yYJ/5xqpE15JYDJtCFdDF7RDLuiXtTiSF1FU1H9waiub1kgwI="
-	validPrivKeyPattern   = "Oe1xUe+sNT7F5SboHSpfCubMhJlAaghB3SZ=NMmkIHTSzWVoF3uTOnxv32cgI+WuEDXYS+z5MvX+q9IUJ1cYo=+ "
-	invalidPrivKeyPattern = "Oe1xUe+sNT7F5SboHSpfCubMhJlAaghB3SZ=NMmkIHTSzWVoF3uTOnxv32cgI+WuEDXYS+z5MvX+q9IUJ1cYo=+"
-	keyword               = "kraken"
+	validKeyPattern             = "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAhIiMkJSYnKCkq"
+	invalidKeyPattern           = "AQIDBAUGBwgJCgsMDQ4PEBESExQV=hcYGRobHB0eHyAhIiMkJSYnKCkq"
+	validPrivKeyPattern         = "KywtLi8wMTIzNDU2Nzg5Ojs8PT4/QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl9gYWJjZGVmZ2hpag=="
+	validUnpaddedPrivKeyPattern = "KywtLi8wMTIzNDU2Nzg5Ojs8PT4/QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl9gYWJjZGVmZ2hpag"
+	invalidPrivKeyPattern       = "KywtLi8wMTIzNDU2Nzg5Ojs8PT4/QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl9gYWJjZG=mhpag=="
+	keyword                     = "kraken"
 )
 
 func TestKraken_Pattern(t *testing.T) {
@@ -31,7 +31,20 @@ func TestKraken_Pattern(t *testing.T) {
 		{
 			name:  "valid pattern - with keyword kraken",
 			input: fmt.Sprintf("%s '%s' %s '%s'", keyword, validKeyPattern, keyword, validPrivKeyPattern),
-			want:  []string{strings.TrimSpace(validKeyPattern) + strings.TrimSpace(validPrivKeyPattern)},
+			want:  []string{validKeyPattern + validPrivKeyPattern},
+		},
+		{
+			name:  "valid pattern - private key without base64 padding",
+			input: fmt.Sprintf("%s '%s' %s '%s'", keyword, validKeyPattern, keyword, validUnpaddedPrivKeyPattern),
+			want:  []string{validKeyPattern + validUnpaddedPrivKeyPattern},
+		},
+		{
+			name: "valid pattern - quoted env vars",
+			input: fmt.Sprintf(`
+KRAKEN_API_KEY="%s"
+KRAKEN_PRIVATE_KEY="%s"
+`, validKeyPattern, validPrivKeyPattern),
+			want: []string{validKeyPattern + validPrivKeyPattern},
 		},
 		{
 			name:  "valid pattern - key out of prefix range",
@@ -39,8 +52,13 @@ func TestKraken_Pattern(t *testing.T) {
 			want:  []string{},
 		},
 		{
-			name:  "invalid pattern",
-			input: fmt.Sprintf("%s key = '%s' secret = '%s'", keyword, invalidKeyPattern, invalidPrivKeyPattern),
+			name:  "invalid pattern - malformed api key base64 padding",
+			input: fmt.Sprintf("%s key = '%s' %s secret = '%s'", keyword, invalidKeyPattern, keyword, validPrivKeyPattern),
+			want:  []string{},
+		},
+		{
+			name:  "invalid pattern - malformed private key base64 padding",
+			input: fmt.Sprintf("%s key = '%s' %s secret = '%s'", keyword, validKeyPattern, keyword, invalidPrivKeyPattern),
 			want:  []string{},
 		},
 	}
