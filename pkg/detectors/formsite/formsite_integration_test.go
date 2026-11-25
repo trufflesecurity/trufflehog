@@ -23,10 +23,10 @@ func TestFormsite_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("FORMSITE")
-	inactiveSecret := testSecrets.MustGetField("FORMSITE_INACTIVE")
-	server := testSecrets.MustGetField("FORMSITE_SERVER")
-	user := testSecrets.MustGetField("FORMSITE_USER")
+	secret := testSecrets.MustGetField(t, "FORMSITE")
+	inactiveSecret := testSecrets.MustGetField(t, "FORMSITE_INACTIVE")
+	server := testSecrets.MustGetField(t, "FORMSITE_SERVER")
+	user := testSecrets.MustGetField(t, "FORMSITE_USER")
 
 	type args struct {
 		ctx    context.Context

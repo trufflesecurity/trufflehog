@@ -32,7 +32,7 @@ func TestAnalyzer_Analyze(t *testing.T) {
 	}{
 		{
 			name:    "valid posthog api key",
-			key:     testSecrets.MustGetField("POSTHOG_API_KEY"),
+			key:     testSecrets.MustGetField(t, "POSTHOG_API_KEY"),
 			want:    string(expectedOutput),
 			wantErr: false,
 		},

@@ -23,9 +23,9 @@ func TestSiteleaf_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("SITELEAF_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("SITELEAF_INACTIVE")
-	id := testSecrets.MustGetField("SITELEAF_USERID")
+	secret := testSecrets.MustGetField(t, "SITELEAF_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "SITELEAF_INACTIVE")
+	id := testSecrets.MustGetField(t, "SITELEAF_USERID")
 
 	type args struct {
 		ctx    context.Context

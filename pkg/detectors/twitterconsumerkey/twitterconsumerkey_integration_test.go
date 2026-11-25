@@ -24,11 +24,11 @@ func TestTwitterConsumerKey_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	key := testSecrets.MustGetField("TWITTER_CONSUMER_KEY")
-	secret := testSecrets.MustGetField("TWITTER_CONSUMER_SECRET")
+	key := testSecrets.MustGetField(t, "TWITTER_CONSUMER_KEY")
+	secret := testSecrets.MustGetField(t, "TWITTER_CONSUMER_SECRET")
 
-	inactiveKey := testSecrets.MustGetField("TWITTER_CONSUMER_KEY_INACTIVE")
-	inactiveSecret := testSecrets.MustGetField("TWITTER_CONSUMER_SECRET_INACTIVE")
+	inactiveKey := testSecrets.MustGetField(t, "TWITTER_CONSUMER_KEY_INACTIVE")
+	inactiveSecret := testSecrets.MustGetField(t, "TWITTER_CONSUMER_SECRET_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -115,7 +115,7 @@ func TestTwitterConsumerKey_FromChunk(t *testing.T) {
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "verificationError")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("TwitterConsumerKey.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

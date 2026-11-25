@@ -23,8 +23,8 @@ func TestBugsnag_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("BUGSNAG")
-	inactiveSecret := testSecrets.MustGetField("BUGSNAG_INACTIVE")
+	secret := testSecrets.MustGetField(t, "BUGSNAG")
+	inactiveSecret := testSecrets.MustGetField(t, "BUGSNAG_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

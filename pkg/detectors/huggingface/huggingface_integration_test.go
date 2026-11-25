@@ -24,8 +24,8 @@ func TestHuggingface_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("HUGGINGFACE")
-	inactiveSecret := testSecrets.MustGetField("HUGGINGFACE_INACTIVE")
+	secret := testSecrets.MustGetField(t, "HUGGINGFACE")
+	inactiveSecret := testSecrets.MustGetField(t, "HUGGINGFACE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -193,7 +193,7 @@ func TestHuggingface_FromChunk(t *testing.T) {
 				got[i].SecretParts = nil
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("Huggingface.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

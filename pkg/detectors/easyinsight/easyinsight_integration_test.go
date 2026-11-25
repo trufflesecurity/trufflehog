@@ -23,9 +23,9 @@ func TestEasyInsight_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("EASYINSIGHT")
-	inactiveSecret := testSecrets.MustGetField("EASYINSIGHT_INACTIVE")
-	id := testSecrets.MustGetField("EASYINSIGHT_ID")
+	secret := testSecrets.MustGetField(t, "EASYINSIGHT")
+	inactiveSecret := testSecrets.MustGetField(t, "EASYINSIGHT_INACTIVE")
+	id := testSecrets.MustGetField(t, "EASYINSIGHT_ID")
 
 	type args struct {
 		ctx    context.Context

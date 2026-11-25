@@ -23,8 +23,8 @@ func TestNumverify_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("NUMVERIFY")
-	inactiveSecret := testSecrets.MustGetField("NUMVERIFY_INACTIVE")
+	secret := testSecrets.MustGetField(t, "NUMVERIFY")
+	inactiveSecret := testSecrets.MustGetField(t, "NUMVERIFY_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

@@ -32,7 +32,7 @@ func TestAnalyzer_Analyze(t *testing.T) {
 	}{
 		{
 			name:    "valid digitalocean key",
-			key:     testSecrets.MustGetField("DIGITALOCEAN_PERSONAL_ACCESS_TOKEN"),
+			key:     testSecrets.MustGetField(t, "DIGITALOCEAN_PERSONAL_ACCESS_TOKEN"),
 			want:    string(expectedOutput),
 			wantErr: false,
 		},

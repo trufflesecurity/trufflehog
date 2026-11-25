@@ -23,9 +23,9 @@ func TestInstamojo_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	id := testSecrets.MustGetField("INSTAMOJO_CLIENT_ID")
-	secret := testSecrets.MustGetField("INSTAMOJO_SECRET")
-	inactiveSecret := testSecrets.MustGetField("INSTAMOJO_INACTIVE")
+	id := testSecrets.MustGetField(t, "INSTAMOJO_CLIENT_ID")
+	secret := testSecrets.MustGetField(t, "INSTAMOJO_SECRET")
+	inactiveSecret := testSecrets.MustGetField(t, "INSTAMOJO_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

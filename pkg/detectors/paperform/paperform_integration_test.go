@@ -23,8 +23,8 @@ func TestPaperform_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("PAPERFORM")
-	inactiveSecret := testSecrets.MustGetField("PAPERFORM_INACTIVE")
+	secret := testSecrets.MustGetField(t, "PAPERFORM")
+	inactiveSecret := testSecrets.MustGetField(t, "PAPERFORM_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

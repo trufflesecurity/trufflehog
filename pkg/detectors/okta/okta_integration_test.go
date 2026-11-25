@@ -24,9 +24,9 @@ func TestOkta_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("OKTA")
-	secretInactive := testSecrets.MustGetField("OKTA_INACTIVE")
-	domain := testSecrets.MustGetField("OKTA_DOMAIN")
+	secret := testSecrets.MustGetField(t, "OKTA")
+	secretInactive := testSecrets.MustGetField(t, "OKTA_INACTIVE")
+	domain := testSecrets.MustGetField(t, "OKTA_DOMAIN")
 
 	type args struct {
 		ctx    context.Context
@@ -121,7 +121,7 @@ func TestOkta_FromChunk(t *testing.T) {
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("Okta.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

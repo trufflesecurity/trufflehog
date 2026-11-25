@@ -29,8 +29,8 @@ func TestOctopusDeploy_FromData(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	baseURL := testSecrets.MustGetField("OCTOPUS_CLOUD_URL")
-	activeToken := testSecrets.MustGetField("OCTOPUS_API_KEY")
+	baseURL := testSecrets.MustGetField(t, "OCTOPUS_CLOUD_URL")
+	activeToken := testSecrets.MustGetField(t, "OCTOPUS_API_KEY")
 
 	inactiveToken := "API-AAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 
@@ -174,14 +174,11 @@ func TestOctopusDeploy_FromData(t *testing.T) {
 				detectors.Result{},
 				"ExtraData",
 				"verificationError",
-				"primarySecret",
 				"Redacted",
-				"chunkOffset",
-				"chunkOffsetSet",
 				"SecretParts",
 			)
 
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("OctopusDeploy.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

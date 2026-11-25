@@ -23,8 +23,8 @@ func TestConversionTools_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("CONVERSIONTOOLS")
-	inactiveSecret := testSecrets.MustGetField("CONVERSIONTOOLS_INACTIVE")
+	secret := testSecrets.MustGetField(t, "CONVERSIONTOOLS")
+	inactiveSecret := testSecrets.MustGetField(t, "CONVERSIONTOOLS_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

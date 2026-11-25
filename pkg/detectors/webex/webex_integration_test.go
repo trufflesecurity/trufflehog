@@ -23,9 +23,9 @@ func TestWebex_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("WEBEX_CLIENT_SECRET")
-	inactiveId := testSecrets.MustGetField("WEBEX_CLIENT_ID_INACTIVE")
-	id := testSecrets.MustGetField("WEBEX_CLIENT_ID")
+	secret := testSecrets.MustGetField(t, "WEBEX_CLIENT_SECRET")
+	inactiveId := testSecrets.MustGetField(t, "WEBEX_CLIENT_ID_INACTIVE")
+	id := testSecrets.MustGetField(t, "WEBEX_CLIENT_ID")
 	type args struct {
 		ctx    context.Context
 		data   []byte

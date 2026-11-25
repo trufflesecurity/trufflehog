@@ -336,7 +336,7 @@ func TestPostgres_FromChunk(t *testing.T) {
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "verificationError", "SecretParts", "ExtraData")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("Postgres.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

@@ -23,8 +23,8 @@ func TestFixerIO_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("FIXERIO_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("FIXERIO_INACTIVE")
+	secret := testSecrets.MustGetField(t, "FIXERIO_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "FIXERIO_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

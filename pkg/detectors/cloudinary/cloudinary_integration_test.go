@@ -24,10 +24,10 @@ func TestCloudinary_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	cloudName := testSecrets.MustGetField("CLOUDINARY_CLOUD_NAME")
-	apiKey := testSecrets.MustGetField("CLOUDINARY_API_KEY")
-	apiSecret := testSecrets.MustGetField("CLOUDINARY_SECRET_KEY")
-	inactiveSecret := testSecrets.MustGetField("CLOUDINARY_INACTIVE_SECRET_KEY")
+	cloudName := testSecrets.MustGetField(t, "CLOUDINARY_CLOUD_NAME")
+	apiKey := testSecrets.MustGetField(t, "CLOUDINARY_API_KEY")
+	apiSecret := testSecrets.MustGetField(t, "CLOUDINARY_SECRET_KEY")
+	inactiveSecret := testSecrets.MustGetField(t, "CLOUDINARY_INACTIVE_SECRET_KEY")
 
 	type args struct {
 		ctx    context.Context
@@ -144,7 +144,7 @@ func TestCloudinary_FromChunk(t *testing.T) {
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "ExtraData", "verificationError", "primarySecret", "SecretParts")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("Cloudinary.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

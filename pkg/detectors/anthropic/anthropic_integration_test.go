@@ -26,8 +26,8 @@ func TestAnthropic_FromChunk(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	apiKey := testSecrets.MustGetField("ANTHROPIC")
-	inactiveSecret := testSecrets.MustGetField("ANTHROPIC_INACTIVE")
+	apiKey := testSecrets.MustGetField(t, "ANTHROPIC")
+	inactiveSecret := testSecrets.MustGetField(t, "ANTHROPIC_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -122,7 +122,7 @@ func TestAnthropic_FromChunk(t *testing.T) {
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "SecretParts")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("Anthropic.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

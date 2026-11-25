@@ -23,8 +23,8 @@ func TestApi2Cart_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("API2CART")
-	inactiveSecret := testSecrets.MustGetField("API2CART_INACTIVE")
+	secret := testSecrets.MustGetField(t, "API2CART")
+	inactiveSecret := testSecrets.MustGetField(t, "API2CART_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

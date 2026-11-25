@@ -23,8 +23,8 @@ func TestNoticeable_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("NOTICEABLE")
-	inactiveSecret := testSecrets.MustGetField("NOTICEABLE_INACTIVE")
+	secret := testSecrets.MustGetField(t, "NOTICEABLE")
+	inactiveSecret := testSecrets.MustGetField(t, "NOTICEABLE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

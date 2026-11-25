@@ -23,8 +23,8 @@ func TestClustDoc_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("CLUSTDOC")
-	inactiveSecret := testSecrets.MustGetField("CLUSTDOC_INACTIVE")
+	secret := testSecrets.MustGetField(t, "CLUSTDOC")
+	inactiveSecret := testSecrets.MustGetField(t, "CLUSTDOC_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

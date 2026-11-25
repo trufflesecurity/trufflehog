@@ -23,8 +23,8 @@ func TestMeistertask_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("MEISTERTASK")
-	inactiveSecret := testSecrets.MustGetField("MEISTERTASK_INACTIVE")
+	secret := testSecrets.MustGetField(t, "MEISTERTASK")
+	inactiveSecret := testSecrets.MustGetField(t, "MEISTERTASK_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

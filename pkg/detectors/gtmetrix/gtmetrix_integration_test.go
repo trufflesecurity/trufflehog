@@ -23,8 +23,8 @@ func TestGTMetrix_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("GTMETRIX")
-	inactiveSecret := testSecrets.MustGetField("GTMETRIX_INACTIVE")
+	secret := testSecrets.MustGetField(t, "GTMETRIX")
+	inactiveSecret := testSecrets.MustGetField(t, "GTMETRIX_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

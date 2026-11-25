@@ -23,8 +23,8 @@ func TestAxonaut_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("AXONAUT")
-	inactiveSecret := testSecrets.MustGetField("AXONAUT_INACTIVE")
+	secret := testSecrets.MustGetField(t, "AXONAUT")
+	inactiveSecret := testSecrets.MustGetField(t, "AXONAUT_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

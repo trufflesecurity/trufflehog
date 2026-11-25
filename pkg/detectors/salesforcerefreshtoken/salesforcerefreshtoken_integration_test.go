@@ -25,10 +25,10 @@ func TestSalesforcerefreshtoken_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	refreshToken := testSecrets.MustGetField("SALESFORCE_REFRESH_TOKEN")
-	consumerKey := testSecrets.MustGetField("SALESFORCE_REFRESH_TOKEN_KEY")
-	consumerSecret := testSecrets.MustGetField("SALESFORCE_REFRESH_TOKEN_SECRET")
-	inactiveSecret := testSecrets.MustGetField("SALESFORCE_REFRESH_TOKEN_INACTIVE_SECRET")
+	refreshToken := testSecrets.MustGetField(t, "SALESFORCE_REFRESH_TOKEN")
+	consumerKey := testSecrets.MustGetField(t, "SALESFORCE_REFRESH_TOKEN_KEY")
+	consumerSecret := testSecrets.MustGetField(t, "SALESFORCE_REFRESH_TOKEN_SECRET")
+	inactiveSecret := testSecrets.MustGetField(t, "SALESFORCE_REFRESH_TOKEN_INACTIVE_SECRET")
 
 	type args struct {
 		ctx    context.Context
@@ -160,6 +160,7 @@ func TestSalesforcerefreshtoken_FromChunk(t *testing.T) {
 			// This checks that for every `want` result, there is a matching `got` result.
 			opts := []cmp.Option{
 				cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "ExtraData", "VerificationFromCache", "primarySecret"),
+				cmpopts.IgnoreUnexported(detectors.Result{}),
 				cmpopts.SortSlices(func(a, b detectors.Result) bool { return a.Verified }),
 			}
 			if diff := cmp.Diff(tt.want, got, opts...); diff != "" {

@@ -23,8 +23,8 @@ func TestVyte_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("VYTE")
-	inactiveSecret := testSecrets.MustGetField("VYTE_INACTIVE")
+	secret := testSecrets.MustGetField(t, "VYTE")
+	inactiveSecret := testSecrets.MustGetField(t, "VYTE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

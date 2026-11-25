@@ -23,8 +23,8 @@ func TestSegmentApiKey_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("SEGMENTAPIKEY_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("SEGMENTAPIKEY_INACTIVE")
+	secret := testSecrets.MustGetField(t, "SEGMENTAPIKEY_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "SEGMENTAPIKEY_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

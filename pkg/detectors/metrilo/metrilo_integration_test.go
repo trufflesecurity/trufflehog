@@ -23,8 +23,8 @@ func TestMetrilo_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("METRILO")
-	inactiveSecret := testSecrets.MustGetField("METRILO_INACTIVE")
+	secret := testSecrets.MustGetField(t, "METRILO")
+	inactiveSecret := testSecrets.MustGetField(t, "METRILO_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

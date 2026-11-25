@@ -60,6 +60,7 @@ var (
 	SonarQubeDetectorEnabled                 atomic.Bool
 	InfisicalDetectorEnabled                 atomic.Bool
 	ServalDetectorEnabled                    atomic.Bool
+	BasetenDetectorEnabled                   atomic.Bool
 	PostOnceDetectorEnabled                  atomic.Bool
 )
 

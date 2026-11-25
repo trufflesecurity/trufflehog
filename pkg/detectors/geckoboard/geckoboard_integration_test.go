@@ -23,8 +23,8 @@ func TestGeckoboard_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("GECKOBOARD")
-	inactiveSecret := testSecrets.MustGetField("GECKOBOARD_INACTIVE")
+	secret := testSecrets.MustGetField(t, "GECKOBOARD")
+	inactiveSecret := testSecrets.MustGetField(t, "GECKOBOARD_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

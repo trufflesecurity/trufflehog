@@ -24,10 +24,10 @@ func TestZulipChat_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("ZULIPCHAT")
-	domain := testSecrets.MustGetField("ZULIPCHAT_DOMAINV2")
-	id := testSecrets.MustGetField("ZULIPCHAT_ID")
-	inactiveSecret := testSecrets.MustGetField("ZULIPCHAT_INACTIVE")
+	secret := testSecrets.MustGetField(t, "ZULIPCHAT")
+	domain := testSecrets.MustGetField(t, "ZULIPCHAT_DOMAINV2")
+	id := testSecrets.MustGetField(t, "ZULIPCHAT_ID")
+	inactiveSecret := testSecrets.MustGetField(t, "ZULIPCHAT_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -143,7 +143,7 @@ func TestZulipChat_FromChunk(t *testing.T) {
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("Zulipchat.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

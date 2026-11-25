@@ -23,8 +23,8 @@ func TestBscscan_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("BSCSCAN")
-	inactiveSecret := testSecrets.MustGetField("BSCSCAN_INACTIVE")
+	secret := testSecrets.MustGetField(t, "BSCSCAN")
+	inactiveSecret := testSecrets.MustGetField(t, "BSCSCAN_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

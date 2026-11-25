@@ -23,8 +23,8 @@ func TestSonarCloud_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("SONARCLOUD")
-	inactiveSecret := testSecrets.MustGetField("SONARCLOUD_INACTIVE")
+	secret := testSecrets.MustGetField(t, "SONARCLOUD")
+	inactiveSecret := testSecrets.MustGetField(t, "SONARCLOUD_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

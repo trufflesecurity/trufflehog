@@ -25,13 +25,13 @@ func TestSourcegraph_FromChunk(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	secretV1 := testSecrets.MustGetField("SOURCEGRAPH_V1")
-	secretV2 := testSecrets.MustGetField("SOURCEGRAPH_V2")
-	secretV3 := testSecrets.MustGetField("SOURCEGRAPH_V3")
+	secretV1 := testSecrets.MustGetField(t, "SOURCEGRAPH_V1")
+	secretV2 := testSecrets.MustGetField(t, "SOURCEGRAPH_V2")
+	secretV3 := testSecrets.MustGetField(t, "SOURCEGRAPH_V3")
 
-	inactiveSecretV1 := testSecrets.MustGetField("SOURCEGRAPH_INACTIVE_V1")
-	inactiveSecretV2 := testSecrets.MustGetField("SOURCEGRAPH_INACTIVE_V2")
-	inactiveSecretV3 := testSecrets.MustGetField("SOURCEGRAPH_INACTIVE_V3")
+	inactiveSecretV1 := testSecrets.MustGetField(t, "SOURCEGRAPH_INACTIVE_V1")
+	inactiveSecretV2 := testSecrets.MustGetField(t, "SOURCEGRAPH_INACTIVE_V2")
+	inactiveSecretV3 := testSecrets.MustGetField(t, "SOURCEGRAPH_INACTIVE_V3")
 
 	type args struct {
 		ctx    context.Context
@@ -229,7 +229,7 @@ func TestSourcegraph_FromChunk(t *testing.T) {
 				got[i].SecretParts = nil
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "VerificationError", "ExtraData")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("Sourcegraph.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

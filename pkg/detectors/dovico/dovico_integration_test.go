@@ -23,10 +23,10 @@ func TestDovico_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("DOVICO_CLIENT")
-	user := testSecrets.MustGetField("DOVICO_USER")
-	inactiveSecret := testSecrets.MustGetField("DOVICO_CLIENT_INACTIVE")
-	inactiveUser := testSecrets.MustGetField("DOVICO_USER_INACTIVE")
+	secret := testSecrets.MustGetField(t, "DOVICO_CLIENT")
+	user := testSecrets.MustGetField(t, "DOVICO_USER")
+	inactiveSecret := testSecrets.MustGetField(t, "DOVICO_CLIENT_INACTIVE")
+	inactiveUser := testSecrets.MustGetField(t, "DOVICO_USER_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

@@ -21,13 +21,13 @@ func TestNetsuite_FromChunk(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	consumerKey := testSecrets.MustGetField("NETSUITE_CONSUMER_KEY")
-	consumerSecret := testSecrets.MustGetField("NETSUITE_CONSUMER_SECRET")
-	tokenKey := testSecrets.MustGetField("NETSUITE_TOKEN_KEY")
-	tokenSecret := testSecrets.MustGetField("NETSUITE_TOKEN_SECRET")
-	accountID := testSecrets.MustGetField("NETSUITE_ACCOUNT_ID")
+	consumerKey := testSecrets.MustGetField(t, "NETSUITE_CONSUMER_KEY")
+	consumerSecret := testSecrets.MustGetField(t, "NETSUITE_CONSUMER_SECRET")
+	tokenKey := testSecrets.MustGetField(t, "NETSUITE_TOKEN_KEY")
+	tokenSecret := testSecrets.MustGetField(t, "NETSUITE_TOKEN_SECRET")
+	accountID := testSecrets.MustGetField(t, "NETSUITE_ACCOUNT_ID")
 
-	inactiveConsumerSecret := testSecrets.MustGetField("NETSUITE_CONSUMER_SECRET_INACTIVE")
+	inactiveConsumerSecret := testSecrets.MustGetField(t, "NETSUITE_CONSUMER_SECRET_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

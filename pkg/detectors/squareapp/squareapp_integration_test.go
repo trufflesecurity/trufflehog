@@ -24,9 +24,9 @@ func TestSquareApp_FromChunk(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	id := testSecrets.MustGetField("SQUAREAPP_ID")
-	secret := testSecrets.MustGetField("SQUAREAPP_SECRET")
-	secretInactive := testSecrets.MustGetField("SQUAREAPP_INACTIVE")
+	id := testSecrets.MustGetField(t, "SQUAREAPP_ID")
+	secret := testSecrets.MustGetField(t, "SQUAREAPP_SECRET")
+	secretInactive := testSecrets.MustGetField(t, "SQUAREAPP_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

@@ -23,9 +23,9 @@ func TestRoninApp_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("RONINAPP")
-	inactiveSecret := testSecrets.MustGetField("RONINAPP_INACTIVE")
-	domain := testSecrets.MustGetField("RONINAPP_DOMAIN")
+	secret := testSecrets.MustGetField(t, "RONINAPP")
+	inactiveSecret := testSecrets.MustGetField(t, "RONINAPP_INACTIVE")
+	domain := testSecrets.MustGetField(t, "RONINAPP_DOMAIN")
 
 	type args struct {
 		ctx    context.Context

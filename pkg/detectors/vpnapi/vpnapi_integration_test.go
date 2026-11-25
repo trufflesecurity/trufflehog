@@ -23,8 +23,8 @@ func TestVpnapi_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("VPNAPI")
-	inactiveSecret := testSecrets.MustGetField("VPNAPI_INACTIVE")
+	secret := testSecrets.MustGetField(t, "VPNAPI")
+	inactiveSecret := testSecrets.MustGetField(t, "VPNAPI_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

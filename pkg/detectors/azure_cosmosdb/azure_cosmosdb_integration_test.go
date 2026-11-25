@@ -25,9 +25,9 @@ func TestCosmosDB_FromChunk(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	key := testSecrets.MustGetField("COSMOSDB_KEY")
-	accountUrl := testSecrets.MustGetField("COSMOSDB_ACCOUNT")
-	inactiveKey := testSecrets.MustGetField("COSMOSDB_INACTIVE")
+	key := testSecrets.MustGetField(t, "COSMOSDB_KEY")
+	accountUrl := testSecrets.MustGetField(t, "COSMOSDB_ACCOUNT")
+	inactiveKey := testSecrets.MustGetField(t, "COSMOSDB_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -105,7 +105,7 @@ func TestCosmosDB_FromChunk(t *testing.T) {
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("CosmosDB.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

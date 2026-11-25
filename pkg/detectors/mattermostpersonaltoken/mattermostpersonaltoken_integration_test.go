@@ -23,9 +23,9 @@ func TestMattermostPersonalToken_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("MATTERMOSTPERSONALTOKEN_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("MATTERMOSTPERSONALTOKEN_INACTIVE")
-	server := testSecrets.MustGetField("MATTERMOSTPERSONALTOKEN_SERVER")
+	secret := testSecrets.MustGetField(t, "MATTERMOSTPERSONALTOKEN_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "MATTERMOSTPERSONALTOKEN_INACTIVE")
+	server := testSecrets.MustGetField(t, "MATTERMOSTPERSONALTOKEN_SERVER")
 
 	type args struct {
 		ctx    context.Context

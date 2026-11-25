@@ -23,9 +23,9 @@ func TestFaceplusplus_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	key := testSecrets.MustGetField("FACEPLUSPLUS_KEY")
-	secret := testSecrets.MustGetField("FACEPLUSPLUS_SECRET")
-	inactiveSecret := testSecrets.MustGetField("FACEPLUSPLUS_INACTIVE")
+	key := testSecrets.MustGetField(t, "FACEPLUSPLUS_KEY")
+	secret := testSecrets.MustGetField(t, "FACEPLUSPLUS_SECRET")
+	inactiveSecret := testSecrets.MustGetField(t, "FACEPLUSPLUS_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

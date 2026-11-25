@@ -24,8 +24,8 @@ func TestStoryblokPersonalAccessToken_FromChunk(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	secret := testSecrets.MustGetField("STORYBLOK_PAT")
-	inactiveSecret := testSecrets.MustGetField("STORYBLOK_PAT_INACTIVE")
+	secret := testSecrets.MustGetField(t, "STORYBLOK_PAT")
+	inactiveSecret := testSecrets.MustGetField(t, "STORYBLOK_PAT_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

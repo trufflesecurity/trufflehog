@@ -24,10 +24,10 @@ func TestJiraToken_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("JIRA_V2_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("JIRA_V2_INACTIVE")
-	email := testSecrets.MustGetField("JIRA_V2_EMAIL")
-	domain := testSecrets.MustGetField("JIRA_V2_DOMAIN")
+	secret := testSecrets.MustGetField(t, "JIRA_V2_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "JIRA_V2_INACTIVE")
+	email := testSecrets.MustGetField(t, "JIRA_V2_EMAIL")
+	domain := testSecrets.MustGetField(t, "JIRA_V2_DOMAIN")
 
 	type args struct {
 		ctx    context.Context
@@ -158,7 +158,7 @@ func TestJiraToken_FromChunk(t *testing.T) {
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "primarySecret")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("JiraToken.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

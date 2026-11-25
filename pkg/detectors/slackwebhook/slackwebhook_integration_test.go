@@ -24,10 +24,10 @@ func TestSlackWebhook_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("SLACKWEBHOOK_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("SLACKWEBHOOK_INACTIVE")
-	deletedWebhook := testSecrets.MustGetField("SLACKWEBHOOK_DELETED")
-	deletedUserActiveWebhook := testSecrets.MustGetField("SLACKWEBHOOK_DELETED_USER_ACTIVE_WEBHOOK")
+	secret := testSecrets.MustGetField(t, "SLACKWEBHOOK_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "SLACKWEBHOOK_INACTIVE")
+	deletedWebhook := testSecrets.MustGetField(t, "SLACKWEBHOOK_DELETED")
+	deletedUserActiveWebhook := testSecrets.MustGetField(t, "SLACKWEBHOOK_DELETED_USER_ACTIVE_WEBHOOK")
 
 	type args struct {
 		ctx    context.Context
@@ -167,7 +167,7 @@ func TestSlackWebhook_FromChunk(t *testing.T) {
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("SlackWebhook.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

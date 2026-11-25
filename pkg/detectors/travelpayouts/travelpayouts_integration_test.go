@@ -23,8 +23,8 @@ func TestTravelPayouts_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("TRAVELPAYOUTS")
-	inactiveSecret := testSecrets.MustGetField("TRAVELPAYOUTS_INACTIVE")
+	secret := testSecrets.MustGetField(t, "TRAVELPAYOUTS")
+	inactiveSecret := testSecrets.MustGetField(t, "TRAVELPAYOUTS_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

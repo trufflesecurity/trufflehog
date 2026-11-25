@@ -26,16 +26,16 @@ func TestRobinhoodcrypto_FromChunk(t *testing.T) {
 	}
 
 	// Valid and active credentials.
-	apiKey := testSecrets.MustGetField("ROBINHOODCRYPTO_APIKEY")
-	privateKey := testSecrets.MustGetField("ROBINHOODCRYPTO_PRIVATEKEY")
+	apiKey := testSecrets.MustGetField(t, "ROBINHOODCRYPTO_APIKEY")
+	privateKey := testSecrets.MustGetField(t, "ROBINHOODCRYPTO_PRIVATEKEY")
 
 	// Valid but inactive credentials.
-	inactiveApiKey := testSecrets.MustGetField("ROBINHOODCRYPTO_APIKEY_INACTIVE")
-	inactivePrivateKey := testSecrets.MustGetField("ROBINHOODCRYPTO_PRIVATEKEY_INACTIVE")
+	inactiveApiKey := testSecrets.MustGetField(t, "ROBINHOODCRYPTO_APIKEY_INACTIVE")
+	inactivePrivateKey := testSecrets.MustGetField(t, "ROBINHOODCRYPTO_PRIVATEKEY_INACTIVE")
 
 	// Invalid credentials.
-	deletedApiKey := testSecrets.MustGetField("ROBINHOODCRYPTO_APIKEY_DELETED")
-	deletedPrivateKey := testSecrets.MustGetField("ROBINHOODCRYPTO_PRIVATEKEY_DELETED")
+	deletedApiKey := testSecrets.MustGetField(t, "ROBINHOODCRYPTO_APIKEY_DELETED")
+	deletedPrivateKey := testSecrets.MustGetField(t, "ROBINHOODCRYPTO_PRIVATEKEY_DELETED")
 
 	type args struct {
 		ctx    context.Context
@@ -180,7 +180,7 @@ func TestRobinhoodcrypto_FromChunk(t *testing.T) {
 					}
 				}
 				ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "ExtraData", "Raw", "RawV2", "verificationError")
-				if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+				if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 					t.Errorf("Robinhoodcrypto.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 				}
 			},

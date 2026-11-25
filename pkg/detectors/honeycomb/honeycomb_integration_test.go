@@ -23,8 +23,8 @@ func TestHoneycomb_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("HONEYCOMB")
-	inactiveSecret := testSecrets.MustGetField("HONEYCOMB_INACTIVE")
+	secret := testSecrets.MustGetField(t, "HONEYCOMB")
+	inactiveSecret := testSecrets.MustGetField(t, "HONEYCOMB_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

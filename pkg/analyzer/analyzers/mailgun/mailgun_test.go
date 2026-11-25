@@ -32,7 +32,7 @@ func TestAnalyzer_Analyze(t *testing.T) {
 	}{
 		{
 			name:    "valid Mailgun key",
-			key:     testSecrets.MustGetField("NEW_MAILGUN_TOKEN_ACTIVE"),
+			key:     testSecrets.MustGetField(t, "NEW_MAILGUN_TOKEN_ACTIVE"),
 			want:    string(expectedOutput),
 			wantErr: false,
 		},

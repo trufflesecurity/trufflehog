@@ -32,7 +32,7 @@ func TestAnalyzer_Analyze(t *testing.T) {
 	}{
 		{
 			name:    "valid Stripe restricted key",
-			key:     testSecrets.MustGetField("STRIPE_SECRET"),
+			key:     testSecrets.MustGetField(t, "STRIPE_SECRET"),
 			want:    expectedOutput,
 			wantErr: false,
 		},

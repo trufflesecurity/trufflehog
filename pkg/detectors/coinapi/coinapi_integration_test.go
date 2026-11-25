@@ -23,8 +23,8 @@ func TestCoinApi_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("COINAPI")
-	inactiveSecret := testSecrets.MustGetField("COINAPI_INACTIVE")
+	secret := testSecrets.MustGetField(t, "COINAPI")
+	inactiveSecret := testSecrets.MustGetField(t, "COINAPI_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

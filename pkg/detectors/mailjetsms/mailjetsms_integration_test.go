@@ -23,8 +23,8 @@ func TestMailJetSMS_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("MAILJETSMS_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("MAILJETSMS_INACTIVE")
+	secret := testSecrets.MustGetField(t, "MAILJETSMS_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "MAILJETSMS_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

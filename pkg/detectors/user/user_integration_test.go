@@ -25,9 +25,9 @@ func TestUser_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("USER")
-	inactiveSecret := testSecrets.MustGetField("USER_INACTIVE")
-	endpoint := testSecrets.MustGetField("USER_ENDPOINT")
+	secret := testSecrets.MustGetField(t, "USER")
+	inactiveSecret := testSecrets.MustGetField(t, "USER_INACTIVE")
+	endpoint := testSecrets.MustGetField(t, "USER_ENDPOINT")
 
 	type args struct {
 		ctx    context.Context
@@ -126,11 +126,8 @@ func TestUser_FromChunk(t *testing.T) {
 				detectors.Result{},
 				"ExtraData",
 				"verificationError",
-				"primarySecret",
-				"chunkOffset",
-				"chunkOffsetSet",
 			)
-			if diff := cmp.Diff(tt.want, got, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(tt.want, got, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("User.FromData() %s diff: (-want +got)\n%s", tt.name, diff)
 			}
 		})
@@ -144,8 +141,8 @@ func TestUser_FromChunk_WithCustomEndpoint(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("USER")
-	endpoint := testSecrets.MustGetField("USER_ENDPOINT")
+	secret := testSecrets.MustGetField(t, "USER")
+	endpoint := testSecrets.MustGetField(t, "USER_ENDPOINT")
 
 	s := Scanner{}
 	s.UseFoundEndpoints(true)

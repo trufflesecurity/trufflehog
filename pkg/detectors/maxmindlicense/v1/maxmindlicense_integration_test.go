@@ -23,9 +23,9 @@ func TestMaxMindLicense_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("MAXMIND_LICENSE")
-	user := testSecrets.MustGetField("MAXMIND_USER")
-	inactiveSecret := testSecrets.MustGetField("MAXMIND_LICENSE_INACTIVE")
+	secret := testSecrets.MustGetField(t, "MAXMIND_LICENSE")
+	user := testSecrets.MustGetField(t, "MAXMIND_USER")
+	inactiveSecret := testSecrets.MustGetField(t, "MAXMIND_LICENSE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

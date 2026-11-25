@@ -23,8 +23,8 @@ func TestZenscrape_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("ZENSCRAPE")
-	inactiveSecret := testSecrets.MustGetField("ZENSCRAPE_INACTIVE")
+	secret := testSecrets.MustGetField(t, "ZENSCRAPE")
+	inactiveSecret := testSecrets.MustGetField(t, "ZENSCRAPE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

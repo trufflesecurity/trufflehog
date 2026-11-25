@@ -24,10 +24,10 @@ func TestAmplitudeApiKey_FromChunk(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	key := testSecrets.MustGetField("AMPLITUDEAPI_KEY")
-	secret := testSecrets.MustGetField("AMPLITUDEAPI_SECRET")
-	inactiveKey := testSecrets.MustGetField("AMPLITUDEAPI_KEY_INACTIVE")
-	inactiveSecret := testSecrets.MustGetField("AMPLITUDEAPI_INACTIVE")
+	key := testSecrets.MustGetField(t, "AMPLITUDEAPI_KEY")
+	secret := testSecrets.MustGetField(t, "AMPLITUDEAPI_SECRET")
+	inactiveKey := testSecrets.MustGetField(t, "AMPLITUDEAPI_KEY_INACTIVE")
+	inactiveSecret := testSecrets.MustGetField(t, "AMPLITUDEAPI_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

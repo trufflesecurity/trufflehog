@@ -23,8 +23,8 @@ func TestReallySimpleSystems_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("REALLYSIMPLESYSTEMS")
-	inactiveSecret := testSecrets.MustGetField("REALLYSIMPLESYSTEMS_INACTIVE")
+	secret := testSecrets.MustGetField(t, "REALLYSIMPLESYSTEMS")
+	inactiveSecret := testSecrets.MustGetField(t, "REALLYSIMPLESYSTEMS_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

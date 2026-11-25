@@ -35,7 +35,7 @@ func TestSource_Scan(t *testing.T) {
 	if err != nil {
 		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
 	}
-	jenkinsToken := secret.MustGetField("JENKINS_TOKEN")
+	jenkinsToken := secret.MustGetField(t, "JENKINS_TOKEN")
 
 	type init struct {
 		name       string
@@ -114,7 +114,7 @@ func TestSource_ExpectBuilds(t *testing.T) {
 	if err != nil {
 		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
 	}
-	jenkinsToken := secret.MustGetField("JENKINS_TOKEN")
+	jenkinsToken := secret.MustGetField(t, "JENKINS_TOKEN")
 
 	type init struct {
 		name       string

@@ -24,9 +24,9 @@ func TestCaptainData_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	projId := testSecrets.MustGetField("CAPTAINDATA_PROJID")
-	secret := testSecrets.MustGetField("CAPTAINDATA")
-	inactiveSecret := testSecrets.MustGetField("CAPTAINDATA_INACTIVE")
+	projId := testSecrets.MustGetField(t, "CAPTAINDATA_PROJID")
+	secret := testSecrets.MustGetField(t, "CAPTAINDATA")
+	inactiveSecret := testSecrets.MustGetField(t, "CAPTAINDATA_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -105,7 +105,7 @@ func TestCaptainData_FromChunk(t *testing.T) {
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "ExtraData", "verificationError")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("CaptainData.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

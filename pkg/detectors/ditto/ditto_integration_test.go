@@ -23,8 +23,8 @@ func TestDitto_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("DITTO")
-	inactiveSecret := testSecrets.MustGetField("DITTO_INACTIVE")
+	secret := testSecrets.MustGetField(t, "DITTO")
+	inactiveSecret := testSecrets.MustGetField(t, "DITTO_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

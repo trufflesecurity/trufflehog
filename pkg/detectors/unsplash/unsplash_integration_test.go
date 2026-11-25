@@ -23,8 +23,8 @@ func TestUnsplash_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("UNSPLASH")
-	inactiveSecret := testSecrets.MustGetField("UNSPLASH_INACTIVE")
+	secret := testSecrets.MustGetField(t, "UNSPLASH")
+	inactiveSecret := testSecrets.MustGetField(t, "UNSPLASH_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

@@ -23,9 +23,9 @@ func TestArtsy_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("ARTSY")
-	inactiveSecret := testSecrets.MustGetField("ARTSY_INACTIVE")
-	id := testSecrets.MustGetField("ARTSY_CLIENTID")
+	secret := testSecrets.MustGetField(t, "ARTSY")
+	inactiveSecret := testSecrets.MustGetField(t, "ARTSY_INACTIVE")
+	id := testSecrets.MustGetField(t, "ARTSY_CLIENTID")
 
 	type args struct {
 		ctx    context.Context

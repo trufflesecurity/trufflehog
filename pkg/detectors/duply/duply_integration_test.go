@@ -23,9 +23,9 @@ func TestDuply_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("DUPLY")
-	id := testSecrets.MustGetField("DUPLY_USER")
-	inactiveSecret := testSecrets.MustGetField("DUPLY_INACTIVE")
+	secret := testSecrets.MustGetField(t, "DUPLY")
+	id := testSecrets.MustGetField(t, "DUPLY_USER")
+	inactiveSecret := testSecrets.MustGetField(t, "DUPLY_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

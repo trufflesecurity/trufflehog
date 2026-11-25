@@ -23,10 +23,10 @@ func TestZendeskApi_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	token := testSecrets.MustGetField("ZENDESKAPI_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("ZENDESKAPI_INACTIVE")
-	email := testSecrets.MustGetField("ZENDESK_EMAIL")
-	domain := testSecrets.MustGetField("ZENDESK_DOMAIN")
+	token := testSecrets.MustGetField(t, "ZENDESKAPI_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "ZENDESKAPI_INACTIVE")
+	email := testSecrets.MustGetField(t, "ZENDESK_EMAIL")
+	domain := testSecrets.MustGetField(t, "ZENDESK_DOMAIN")
 
 	type args struct {
 		ctx    context.Context

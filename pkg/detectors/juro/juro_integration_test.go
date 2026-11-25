@@ -23,8 +23,8 @@ func TestJuro_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("JURO")
-	inactiveSecret := testSecrets.MustGetField("JURO_INACTIVE")
+	secret := testSecrets.MustGetField(t, "JURO")
+	inactiveSecret := testSecrets.MustGetField(t, "JURO_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

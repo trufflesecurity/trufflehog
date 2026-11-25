@@ -23,8 +23,8 @@ func TestEcoStruxureIT_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("ECOSTRUXUREIT")
-	inactiveSecret := testSecrets.MustGetField("ECOSTRUXUREIT_INACTIVE")
+	secret := testSecrets.MustGetField(t, "ECOSTRUXUREIT")
+	inactiveSecret := testSecrets.MustGetField(t, "ECOSTRUXUREIT_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

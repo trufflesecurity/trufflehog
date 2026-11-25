@@ -23,8 +23,8 @@ func TestUserflow_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("USERFLOW")
-	inactiveSecret := testSecrets.MustGetField("USERFLOW_INACTIVE")
+	secret := testSecrets.MustGetField(t, "USERFLOW")
+	inactiveSecret := testSecrets.MustGetField(t, "USERFLOW_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

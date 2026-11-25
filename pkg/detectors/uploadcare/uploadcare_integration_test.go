@@ -23,9 +23,9 @@ func TestUploadCare_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("UPLOADCARE")
-	publicKey := testSecrets.MustGetField("UPLOADCARE_PUBLIC")
-	inactiveSecret := testSecrets.MustGetField("UPLOADCARE_INACTIVE")
+	secret := testSecrets.MustGetField(t, "UPLOADCARE")
+	publicKey := testSecrets.MustGetField(t, "UPLOADCARE_PUBLIC")
+	inactiveSecret := testSecrets.MustGetField(t, "UPLOADCARE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

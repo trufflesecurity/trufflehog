@@ -24,8 +24,8 @@ func TestSanity_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("SANITY_AUTHTOKEN")
-	inactiveSecret := testSecrets.MustGetField("SANITY_AUTHTOKEN_INACTIVE")
+	secret := testSecrets.MustGetField(t, "SANITY_AUTHTOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "SANITY_AUTHTOKEN_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -103,7 +103,7 @@ func TestSanity_FromChunk(t *testing.T) {
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("Sanity.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

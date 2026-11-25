@@ -24,10 +24,10 @@ func TestPlaidKey_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("PLAIDKEY_SECRET")
-	inactiveSecret := testSecrets.MustGetField("PLAIDKEY_SECRET_INACTIVE")
-	id := testSecrets.MustGetField("PLAIDKEY_CLIENTID")
-	token := testSecrets.MustGetField("PLAIDKEY_ACCESS_TOKEN")
+	secret := testSecrets.MustGetField(t, "PLAIDKEY_SECRET")
+	inactiveSecret := testSecrets.MustGetField(t, "PLAIDKEY_SECRET_INACTIVE")
+	id := testSecrets.MustGetField(t, "PLAIDKEY_CLIENTID")
+	token := testSecrets.MustGetField(t, "PLAIDKEY_ACCESS_TOKEN")
 	env := "sandbox"
 
 	type args struct {
@@ -116,7 +116,7 @@ func TestPlaidKey_FromChunk(t *testing.T) {
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "SecretParts", "ExtraData")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("PlaidKey.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

@@ -23,12 +23,12 @@ func TestPaypalOauth_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("PAYPALOAUTH_SECRET")
-	inactiveSecret := testSecrets.MustGetField("PAYPALOAUTH_SECRET_INACTIVE")
-	id := testSecrets.MustGetField("PAYPALOAUTH_CLIENTID")
+	secret := testSecrets.MustGetField(t, "PAYPALOAUTH_SECRET")
+	inactiveSecret := testSecrets.MustGetField(t, "PAYPALOAUTH_SECRET_INACTIVE")
+	id := testSecrets.MustGetField(t, "PAYPALOAUTH_CLIENTID")
 
-	newId := testSecrets.MustGetField("PAYPALOAUTH_NEW_INACTIVE_CLIENTID")
-	newSecret := testSecrets.MustGetField("PAYPALOAUTH_NEW_INACTIVE_SECRET")
+	newId := testSecrets.MustGetField(t, "PAYPALOAUTH_NEW_INACTIVE_CLIENTID")
+	newSecret := testSecrets.MustGetField(t, "PAYPALOAUTH_NEW_INACTIVE_SECRET")
 
 	type args struct {
 		ctx    context.Context

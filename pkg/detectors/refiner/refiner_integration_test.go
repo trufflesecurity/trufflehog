@@ -23,8 +23,8 @@ func TestRefiner_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("REFINER")
-	inactiveSecret := testSecrets.MustGetField("REFINER_INACTIVE")
+	secret := testSecrets.MustGetField(t, "REFINER")
+	inactiveSecret := testSecrets.MustGetField(t, "REFINER_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

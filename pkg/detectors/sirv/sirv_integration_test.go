@@ -23,9 +23,9 @@ func TestSirv_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("SIRV")
-	id := testSecrets.MustGetField("SIRV_ID")
-	inactiveSecret := testSecrets.MustGetField("SIRV_INACTIVE")
+	secret := testSecrets.MustGetField(t, "SIRV")
+	id := testSecrets.MustGetField(t, "SIRV_ID")
+	inactiveSecret := testSecrets.MustGetField(t, "SIRV_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

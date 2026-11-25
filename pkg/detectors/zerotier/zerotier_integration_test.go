@@ -24,8 +24,8 @@ func TestZerotier_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("ZEROTIER")
-	inactiveSecret := testSecrets.MustGetField("ZEROTIER_INACTIVE")
+	secret := testSecrets.MustGetField(t, "ZEROTIER")
+	inactiveSecret := testSecrets.MustGetField(t, "ZEROTIER_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -103,7 +103,7 @@ func TestZerotier_FromChunk(t *testing.T) {
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "primarySecret")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("Zerotier.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

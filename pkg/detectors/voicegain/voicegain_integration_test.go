@@ -23,8 +23,8 @@ func TestVoicegain_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("VOICEGAIN")
-	inactiveSecret := testSecrets.MustGetField("VOICEGAIN_INACTIVE")
+	secret := testSecrets.MustGetField(t, "VOICEGAIN")
+	inactiveSecret := testSecrets.MustGetField(t, "VOICEGAIN_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

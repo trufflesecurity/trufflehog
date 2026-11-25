@@ -23,8 +23,8 @@ func TestIpapi_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("IPAPI")
-	inactiveSecret := testSecrets.MustGetField("IPAPI_INACTIVE")
+	secret := testSecrets.MustGetField(t, "IPAPI")
+	inactiveSecret := testSecrets.MustGetField(t, "IPAPI_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

@@ -23,9 +23,9 @@ func TestMagicBell_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("MAGICBELL")
-	inactiveSecret := testSecrets.MustGetField("MAGICBELL_INACTIVE")
-	userEmail := testSecrets.MustGetField("MAGICBELL_USER_EMAIL")
+	secret := testSecrets.MustGetField(t, "MAGICBELL")
+	inactiveSecret := testSecrets.MustGetField(t, "MAGICBELL_INACTIVE")
+	userEmail := testSecrets.MustGetField(t, "MAGICBELL_USER_EMAIL")
 
 	type args struct {
 		ctx    context.Context

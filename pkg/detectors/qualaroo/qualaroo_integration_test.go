@@ -23,8 +23,8 @@ func TestQualaroo_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("QUALAROO_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("QUALAROO_INACTIVE")
+	secret := testSecrets.MustGetField(t, "QUALAROO_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "QUALAROO_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

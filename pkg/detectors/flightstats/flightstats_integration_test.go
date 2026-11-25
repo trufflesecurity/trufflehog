@@ -23,9 +23,9 @@ func TestFlightstats_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	id := testSecrets.MustGetField("FLIGHTSTATS_ID")
-	secret := testSecrets.MustGetField("FLIGHTSTATS_KEY")
-	inactiveSecret := testSecrets.MustGetField("FLIGHTSTATS_INACTIVE")
+	id := testSecrets.MustGetField(t, "FLIGHTSTATS_ID")
+	secret := testSecrets.MustGetField(t, "FLIGHTSTATS_KEY")
+	inactiveSecret := testSecrets.MustGetField(t, "FLIGHTSTATS_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

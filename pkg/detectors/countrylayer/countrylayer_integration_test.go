@@ -23,8 +23,8 @@ func TestCountryLayer_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("COUNTRYLAYER")
-	inactiveSecret := testSecrets.MustGetField("COUNTRYLAYER_INACTIVE")
+	secret := testSecrets.MustGetField(t, "COUNTRYLAYER")
+	inactiveSecret := testSecrets.MustGetField(t, "COUNTRYLAYER_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

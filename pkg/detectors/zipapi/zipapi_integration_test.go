@@ -23,10 +23,10 @@ func TestZipapi_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("ZIPAPI")
-	email := testSecrets.MustGetField("SCANNERS_EMAIL")
-	pword := testSecrets.MustGetField("SCANNERS_PASS")
-	inactiveSecret := testSecrets.MustGetField("ZIPAPI_INACTIVE")
+	secret := testSecrets.MustGetField(t, "ZIPAPI")
+	email := testSecrets.MustGetField(t, "SCANNERS_EMAIL")
+	pword := testSecrets.MustGetField(t, "SCANNERS_PASS")
+	inactiveSecret := testSecrets.MustGetField(t, "ZIPAPI_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

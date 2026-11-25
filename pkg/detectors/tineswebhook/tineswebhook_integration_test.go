@@ -23,8 +23,8 @@ func TestTinesWebhook_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("TINESWEBHOOK_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("TINESWEBHOOK_INACTIVE")
+	secret := testSecrets.MustGetField(t, "TINESWEBHOOK_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "TINESWEBHOOK_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

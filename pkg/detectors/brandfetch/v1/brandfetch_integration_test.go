@@ -23,8 +23,8 @@ func TestBrandfetch_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("BRANDFETCH")
-	inactiveSecret := testSecrets.MustGetField("BRANDFETCH_INACTIVE")
+	secret := testSecrets.MustGetField(t, "BRANDFETCH")
+	inactiveSecret := testSecrets.MustGetField(t, "BRANDFETCH_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

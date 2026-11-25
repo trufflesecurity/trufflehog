@@ -23,8 +23,8 @@ func TestLinkPreview_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("LINKPREVIEW")
-	inactiveSecret := testSecrets.MustGetField("LINKPREVIEW_INACTIVE")
+	secret := testSecrets.MustGetField(t, "LINKPREVIEW")
+	inactiveSecret := testSecrets.MustGetField(t, "LINKPREVIEW_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

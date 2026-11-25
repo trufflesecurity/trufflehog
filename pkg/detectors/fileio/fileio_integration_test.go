@@ -23,8 +23,8 @@ func TestFileIO_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("FILEIO")
-	inactiveSecret := testSecrets.MustGetField("FILEIO_INACTIVE")
+	secret := testSecrets.MustGetField(t, "FILEIO")
+	inactiveSecret := testSecrets.MustGetField(t, "FILEIO_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

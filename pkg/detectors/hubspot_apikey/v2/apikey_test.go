@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
@@ -76,6 +77,76 @@ app.get('/homepage', async (req, res) => {
 
 			if diff := cmp.Diff(expected, actual); diff != "" {
 				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
+			}
+		})
+	}
+}
+
+func TestHubspotV2_Verify(t *testing.T) {
+	tests := []struct {
+		name         string
+		status       int
+		body         string
+		wantVerified bool
+		wantErr      bool
+	}{
+		{
+			name:         "valid token",
+			status:       200,
+			body:         `[{"name":"private-apps-api-calls-daily","usageLimit":250000,"currentUsage":12}]`,
+			wantVerified: true,
+		},
+		{
+			name:    "200 with HTML body from a proxy",
+			status:  200,
+			body:    "<html><body>Access to this site is blocked</body></html>",
+			wantErr: true,
+		},
+		{
+			name:   "invalid token",
+			status: 401,
+			body:   `{"status":"error","message":"Authentication credentials not found.","category":"INVALID_AUTHENTICATION"}`,
+		},
+		{
+			name:         "valid token missing scopes",
+			status:       403,
+			body:         `{"status":"error","message":"This app hasn't been granted all required scopes to make this call.","errors":[{"message":"One or more of the following scopes are required.","context":{"requiredGranularScopes":["oauth"]}}],"category":"MISSING_SCOPES"}`,
+			wantVerified: true,
+		},
+		{
+			name:    "403 from a proxy",
+			status:  403,
+			body:    "<html><body>403 Forbidden</body></html>",
+			wantErr: true,
+		},
+		{
+			name:    "403 with empty body",
+			status:  403,
+			wantErr: true,
+		},
+		{
+			name:    "403 with JSON but not a scope error",
+			status:  403,
+			body:    `{"status":"error","message":"Forbidden"}`,
+			wantErr: true,
+		},
+		{
+			name:    "server error",
+			status:  500,
+			wantErr: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			client := common.ConstantResponseHttpClient(test.status, test.body)
+			verified, err := verifyToken(context.Background(), client, "pat-na1-ffbb9f50-d96b-4abc-84f1-b986617be1b5")
+
+			if (err != nil) != test.wantErr {
+				t.Fatalf("error = %v, wantErr %v", err, test.wantErr)
+			}
+			if verified != test.wantVerified {
+				t.Errorf("verified = %v, want %v", verified, test.wantVerified)
 			}
 		})
 	}

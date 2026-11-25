@@ -24,8 +24,8 @@ func TestKong_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("KONG_KPAT")
-	inactiveSecret := testSecrets.MustGetField("KONG_KPAT_INACTIVE")
+	secret := testSecrets.MustGetField(t, "KONG_KPAT")
+	inactiveSecret := testSecrets.MustGetField(t, "KONG_KPAT_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

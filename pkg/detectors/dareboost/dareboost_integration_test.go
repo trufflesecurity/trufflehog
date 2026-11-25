@@ -23,8 +23,8 @@ func TestDareboost_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("DAREBOOST")
-	inactiveSecret := testSecrets.MustGetField("DAREBOOST_INACTIVE")
+	secret := testSecrets.MustGetField(t, "DAREBOOST")
+	inactiveSecret := testSecrets.MustGetField(t, "DAREBOOST_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

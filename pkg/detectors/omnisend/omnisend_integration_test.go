@@ -23,8 +23,8 @@ func TestOmnisend_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("OMNISEND_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("OMNISEND_INACTIVE")
+	secret := testSecrets.MustGetField(t, "OMNISEND_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "OMNISEND_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

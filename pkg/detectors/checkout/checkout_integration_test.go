@@ -23,9 +23,9 @@ func TestCheckout_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("CHECKOUT")
-	inactiveSecret := testSecrets.MustGetField("CHECKOUT_INACTIVE")
-	secretId := testSecrets.MustGetField("CHECKOUT_ID")
+	secret := testSecrets.MustGetField(t, "CHECKOUT")
+	inactiveSecret := testSecrets.MustGetField(t, "CHECKOUT_INACTIVE")
+	secretId := testSecrets.MustGetField(t, "CHECKOUT_ID")
 
 	type args struct {
 		ctx    context.Context

@@ -23,9 +23,9 @@ func TestNexmoApiKey_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("NEXMOAPIKEY_TOKEN")
-	key := testSecrets.MustGetField("NEXMOAPIKEY_KEY")
-	inactiveSecret := testSecrets.MustGetField("NEXMOAPIKEY_INACTIVE")
+	secret := testSecrets.MustGetField(t, "NEXMOAPIKEY_TOKEN")
+	key := testSecrets.MustGetField(t, "NEXMOAPIKEY_KEY")
+	inactiveSecret := testSecrets.MustGetField(t, "NEXMOAPIKEY_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

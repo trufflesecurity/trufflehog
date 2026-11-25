@@ -23,9 +23,9 @@ func TestApiDeck_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("APIDECK_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("APIDECK_INACTIVE")
-	id := testSecrets.MustGetField("APIDECK_APPID")
+	secret := testSecrets.MustGetField(t, "APIDECK_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "APIDECK_INACTIVE")
+	id := testSecrets.MustGetField(t, "APIDECK_APPID")
 
 	type args struct {
 		ctx    context.Context

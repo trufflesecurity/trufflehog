@@ -24,8 +24,8 @@ func TestMesibo_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("MESIBO")
-	inactiveSecret := testSecrets.MustGetField("MESIBO_INACTIVE")
+	secret := testSecrets.MustGetField(t, "MESIBO")
+	inactiveSecret := testSecrets.MustGetField(t, "MESIBO_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

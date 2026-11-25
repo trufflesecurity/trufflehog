@@ -23,8 +23,8 @@ func TestOanda_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("OANDA")
-	inactiveSecret := testSecrets.MustGetField("OANDA_INACTIVE")
+	secret := testSecrets.MustGetField(t, "OANDA")
+	inactiveSecret := testSecrets.MustGetField(t, "OANDA_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

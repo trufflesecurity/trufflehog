@@ -23,8 +23,8 @@ func TestVerimail_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("VERIMAIL_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("VERIMAIL_INACTIVE")
+	secret := testSecrets.MustGetField(t, "VERIMAIL_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "VERIMAIL_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

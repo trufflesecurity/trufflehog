@@ -23,8 +23,8 @@ func TestEnvoyapikey_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("ENVOYAPIKEY")
-	inactiveSecret := testSecrets.MustGetField("ENVOYAPIKEY_INACTIVE")
+	secret := testSecrets.MustGetField(t, "ENVOYAPIKEY")
+	inactiveSecret := testSecrets.MustGetField(t, "ENVOYAPIKEY_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

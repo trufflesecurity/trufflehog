@@ -24,8 +24,8 @@ func TestWebexbot_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("WEBEXBOT")
-	inactiveSecret := testSecrets.MustGetField("WEBEXBOT_INACTIVE")
+	secret := testSecrets.MustGetField(t, "WEBEXBOT")
+	inactiveSecret := testSecrets.MustGetField(t, "WEBEXBOT_INACTIVE")
 
 	redacted := secret[:5] + "..."
 	inactiveRedacted := inactiveSecret[:5] + "..."
@@ -144,7 +144,7 @@ func TestWebexbot_FromChunk(t *testing.T) {
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "primarySecret", "ExtraData")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("Webexbot.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

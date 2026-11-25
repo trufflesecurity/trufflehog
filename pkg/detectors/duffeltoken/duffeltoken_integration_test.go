@@ -26,7 +26,7 @@ func TestDuffelTestToken_FromData(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	activeToken := testSecrets.MustGetField("DUFFEL_TEST_TOKEN")
+	activeToken := testSecrets.MustGetField(t, "DUFFEL_TEST_TOKEN")
 
 	inactiveToken := "duffel_test_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 
@@ -147,14 +147,11 @@ func TestDuffelTestToken_FromData(t *testing.T) {
 				detectors.Result{},
 				"ExtraData",
 				"verificationError",
-				"primarySecret",
 				"Redacted",
 				"SecretParts",
-				"chunkOffset",
-				"chunkOffsetSet",
 			)
 
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("DuffelTestToken.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

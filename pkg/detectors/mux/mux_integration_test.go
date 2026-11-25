@@ -23,10 +23,10 @@ func TestMux_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	key := testSecrets.MustGetField("MUX_KEY")
-	inactiveKey := testSecrets.MustGetField("MUX_KEY_INACTIVE")
-	secret := testSecrets.MustGetField("MUX")
-	inactiveSecret := testSecrets.MustGetField("MUX_INACTIVE")
+	key := testSecrets.MustGetField(t, "MUX_KEY")
+	inactiveKey := testSecrets.MustGetField(t, "MUX_KEY_INACTIVE")
+	secret := testSecrets.MustGetField(t, "MUX")
+	inactiveSecret := testSecrets.MustGetField(t, "MUX_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

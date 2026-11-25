@@ -23,8 +23,8 @@ func TestFormcraft_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("FORMCRAFT")
-	inactiveSecret := testSecrets.MustGetField("FORMCRAFT_INACTIVE")
+	secret := testSecrets.MustGetField(t, "FORMCRAFT")
+	inactiveSecret := testSecrets.MustGetField(t, "FORMCRAFT_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

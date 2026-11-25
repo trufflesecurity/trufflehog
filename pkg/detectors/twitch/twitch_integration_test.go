@@ -24,9 +24,9 @@ func TestTwitch_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("TWITCH")
-	id := testSecrets.MustGetField("TWITCH_ID")
-	inactiveSecret := testSecrets.MustGetField("TWITCH_INACTIVE")
+	secret := testSecrets.MustGetField(t, "TWITCH")
+	id := testSecrets.MustGetField(t, "TWITCH_ID")
+	inactiveSecret := testSecrets.MustGetField(t, "TWITCH_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -154,7 +154,7 @@ func TestTwitch_FromChunk(t *testing.T) {
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("Twitch.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

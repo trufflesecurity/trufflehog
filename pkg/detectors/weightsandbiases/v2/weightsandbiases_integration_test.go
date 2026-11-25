@@ -25,7 +25,7 @@ func TestWeightsandbiasesV2_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("WEIGHTSANDBIASES_V2")
+	secret := testSecrets.MustGetField(t, "WEIGHTSANDBIASES_V2")
 	inactiveSecret := "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"
 
 	type args struct {
@@ -150,8 +150,8 @@ func TestWeightsandbiasesV2_FromChunk(t *testing.T) {
 					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "primarySecret", "SecretParts", "chunkOffset", "chunkOffsetSet")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "SecretParts")
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("WeightsandbiasesV2.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

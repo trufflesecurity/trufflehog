@@ -30,7 +30,7 @@ func TestPgAnalyzeReadKey_FromData(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	activeToken := testSecrets.MustGetField("PGANALYZE_READ_KEY")
+	activeToken := testSecrets.MustGetField(t, "PGANALYZE_READ_KEY")
 	inactiveToken := "pgar_abcdefghijklmnopqrstuvwxyz1"
 
 	type args struct {
@@ -179,13 +179,10 @@ func TestPgAnalyzeReadKey_FromData(t *testing.T) {
 				detectors.Result{},
 				"ExtraData",
 				"verificationError",
-				"primarySecret",
 				"SecretParts",
-				"chunkOffset",
-				"chunkOffsetSet",
 			)
 
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf(
 					"PgAnalyzeReadKey.FromData() %s diff: (-got +want)\n%s",
 					tt.name,

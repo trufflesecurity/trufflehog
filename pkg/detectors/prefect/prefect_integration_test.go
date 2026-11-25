@@ -23,8 +23,8 @@ func TestPrefect_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("PREFECT")
-	inactiveSecret := testSecrets.MustGetField("PREFECT_INACTIVE")
+	secret := testSecrets.MustGetField(t, "PREFECT")
+	inactiveSecret := testSecrets.MustGetField(t, "PREFECT_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

@@ -23,8 +23,8 @@ func TestCloudsmith_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("CLOUDSMITH")
-	inactiveSecret := testSecrets.MustGetField("CLOUDSMITH_INACTIVE")
+	secret := testSecrets.MustGetField(t, "CLOUDSMITH")
+	inactiveSecret := testSecrets.MustGetField(t, "CLOUDSMITH_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

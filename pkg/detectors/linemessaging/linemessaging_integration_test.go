@@ -23,8 +23,8 @@ func TestLineMessaging_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("LINEMESSAGING_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("LINEMESSAGING_INACTIVE")
+	secret := testSecrets.MustGetField(t, "LINEMESSAGING_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "LINEMESSAGING_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

@@ -23,8 +23,8 @@ func TestAPITemplate_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("APITEMPLATE")
-	inactiveSecret := testSecrets.MustGetField("APITEMPLATE_INACTIVE")
+	secret := testSecrets.MustGetField(t, "APITEMPLATE")
+	inactiveSecret := testSecrets.MustGetField(t, "APITEMPLATE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

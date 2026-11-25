@@ -24,8 +24,8 @@ func TestGrafana_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("GRAFANA")
-	inactiveSecret := testSecrets.MustGetField("GRAFANA_INACTIVE")
+	secret := testSecrets.MustGetField(t, "GRAFANA")
+	inactiveSecret := testSecrets.MustGetField(t, "GRAFANA_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -137,7 +137,7 @@ func TestGrafana_FromChunk(t *testing.T) {
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "primarySecret")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("Grafana.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

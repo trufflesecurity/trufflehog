@@ -23,9 +23,9 @@ func TestPlivo_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("PLIVO_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("PLIVO_INACTIVE")
-	id := testSecrets.MustGetField("PLIVO_ID")
+	secret := testSecrets.MustGetField(t, "PLIVO_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "PLIVO_INACTIVE")
+	id := testSecrets.MustGetField(t, "PLIVO_ID")
 
 	type args struct {
 		ctx    context.Context

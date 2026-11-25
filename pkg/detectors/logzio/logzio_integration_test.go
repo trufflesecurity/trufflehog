@@ -25,8 +25,8 @@ func TestLogzIO_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("LOGZIO")
-	inactiveSecret := testSecrets.MustGetField("LOGZIO_INACTIVE")
+	secret := testSecrets.MustGetField(t, "LOGZIO")
+	inactiveSecret := testSecrets.MustGetField(t, "LOGZIO_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -138,7 +138,7 @@ func TestLogzIO_FromChunk(t *testing.T) {
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("LogzIO.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

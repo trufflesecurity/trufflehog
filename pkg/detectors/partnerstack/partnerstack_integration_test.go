@@ -23,8 +23,8 @@ func TestPartnerstack_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("PARTNERSTACK")
-	inactiveSecret := testSecrets.MustGetField("PARTNERSTACK_INACTIVE")
+	secret := testSecrets.MustGetField(t, "PARTNERSTACK")
+	inactiveSecret := testSecrets.MustGetField(t, "PARTNERSTACK_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

@@ -23,10 +23,10 @@ func TestPoloniex_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	key := testSecrets.MustGetField("POLONIEX_KEY")
-	inactiveKey := testSecrets.MustGetField("POLONIEX_KEY_INACTIVE")
-	secret := testSecrets.MustGetField("POLONIEX")
-	inactiveSecret := testSecrets.MustGetField("POLONIEX_INACTIVE")
+	key := testSecrets.MustGetField(t, "POLONIEX_KEY")
+	inactiveKey := testSecrets.MustGetField(t, "POLONIEX_KEY_INACTIVE")
+	secret := testSecrets.MustGetField(t, "POLONIEX")
+	inactiveSecret := testSecrets.MustGetField(t, "POLONIEX_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

@@ -23,8 +23,8 @@ func TestRoute4me_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("ROUTE4ME")
-	inactiveSecret := testSecrets.MustGetField("ROUTE4ME_INACTIVE")
+	secret := testSecrets.MustGetField(t, "ROUTE4ME")
+	inactiveSecret := testSecrets.MustGetField(t, "ROUTE4ME_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

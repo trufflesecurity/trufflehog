@@ -62,7 +62,7 @@ func AnalyzePermissions(ctx context.Context, cfg *config.Config, token string) (
 	parsedKey, err = ssh.ParseRawPrivateKey([]byte(token))
 	if err != nil && strings.Contains(err.Error(), "private key is passphrase protected") {
 		// key is password protected
-		parsedKey, _, err = privatekey.Crack([]byte(token))
+		parsedKey, _, err = privatekey.Crack(ctx, []byte(token))
 		if err != nil {
 			return nil, err
 		}

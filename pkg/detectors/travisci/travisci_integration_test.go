@@ -23,8 +23,8 @@ func TestTravisCI_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("TRAVISCI_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("TRAVISCI_INACTIVE")
+	secret := testSecrets.MustGetField(t, "TRAVISCI_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "TRAVISCI_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

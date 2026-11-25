@@ -24,10 +24,10 @@ func TestSatismeterProjectkey_FromChunk(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	projectID := testSecrets.MustGetField("SATISMETERPROJECTKEY")
-	inactiveProjectID := testSecrets.MustGetField("SATISMETERPROJECTKEY_INACTIVE")
-	token := testSecrets.MustGetField("SATISMETER_TOKEN")
-	inactiveToken := testSecrets.MustGetField("SATISMETER_TOKEN_INACTIVE")
+	projectID := testSecrets.MustGetField(t, "SATISMETERPROJECTKEY")
+	inactiveProjectID := testSecrets.MustGetField(t, "SATISMETERPROJECTKEY_INACTIVE")
+	token := testSecrets.MustGetField(t, "SATISMETER_TOKEN")
+	inactiveToken := testSecrets.MustGetField(t, "SATISMETER_TOKEN_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

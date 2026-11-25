@@ -31,7 +31,7 @@ func TestAnalyzer_Analyze(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			token:   testSecrets.MustGetField("FIGMAPERSONALACCESSTOKEN_V2_TOKEN"),
+			token:   testSecrets.MustGetField(t, "FIGMAPERSONALACCESSTOKEN_V2_TOKEN"),
 			name:    "valid Figma Personal Access Token",
 			want:    string(expectedOutput),
 			wantErr: false,

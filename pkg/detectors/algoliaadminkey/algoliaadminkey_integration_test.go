@@ -23,9 +23,9 @@ func TestAlgoliaAdminKey_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("ALGOLIAADMINKEY_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("ALGOLIAADMINKEY_INACTIVE")
-	id := testSecrets.MustGetField("ALGOLIAADMINKEY_APPID")
+	secret := testSecrets.MustGetField(t, "ALGOLIAADMINKEY_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "ALGOLIAADMINKEY_INACTIVE")
+	id := testSecrets.MustGetField(t, "ALGOLIAADMINKEY_APPID")
 
 	type args struct {
 		ctx    context.Context

@@ -23,8 +23,8 @@ func TestLocationIQ_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("LOCATIONIQ")
-	inactiveSecret := testSecrets.MustGetField("LOCATIONIQ_INACTIVE")
+	secret := testSecrets.MustGetField(t, "LOCATIONIQ")
+	inactiveSecret := testSecrets.MustGetField(t, "LOCATIONIQ_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

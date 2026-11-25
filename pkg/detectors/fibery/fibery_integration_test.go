@@ -23,9 +23,9 @@ func TestFibery_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("FIBERY_SECRET")
-	domain := testSecrets.MustGetField("FIBERY_DOMAIN")
-	inactiveSecret := testSecrets.MustGetField("FIBERY_INACTIVE")
+	secret := testSecrets.MustGetField(t, "FIBERY_SECRET")
+	domain := testSecrets.MustGetField(t, "FIBERY_DOMAIN")
+	inactiveSecret := testSecrets.MustGetField(t, "FIBERY_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

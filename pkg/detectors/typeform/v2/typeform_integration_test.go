@@ -24,8 +24,8 @@ func TestTypeform_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("TYPEFORM_V2")
-	inactiveSecret := testSecrets.MustGetField("TYPEFORM_V2_INACTIVE")
+	secret := testSecrets.MustGetField(t, "TYPEFORM_V2")
+	inactiveSecret := testSecrets.MustGetField(t, "TYPEFORM_V2_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -109,7 +109,7 @@ func TestTypeform_FromChunk(t *testing.T) {
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("TypeForm.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

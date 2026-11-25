@@ -25,9 +25,9 @@ func TestNgrok_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secretAPIKey := testSecrets.MustGetField("NGROK")
-	secretAuthtoken := testSecrets.MustGetField("NGROK_AUTHTOKEN")
-	inactiveSecret := testSecrets.MustGetField("NGROK_INACTIVE")
+	secretAPIKey := testSecrets.MustGetField(t, "NGROK")
+	secretAuthtoken := testSecrets.MustGetField(t, "NGROK_AUTHTOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "NGROK_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -122,7 +122,7 @@ func TestNgrok_FromChunk(t *testing.T) {
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("Ngrok.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

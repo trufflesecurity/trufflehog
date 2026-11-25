@@ -23,8 +23,8 @@ func TestAirVisual_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("AIRVISUAL")
-	inactiveSecret := testSecrets.MustGetField("AIRVISUAL_INACTIVE")
+	secret := testSecrets.MustGetField(t, "AIRVISUAL")
+	inactiveSecret := testSecrets.MustGetField(t, "AIRVISUAL_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

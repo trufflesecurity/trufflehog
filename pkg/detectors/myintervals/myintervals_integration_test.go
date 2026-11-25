@@ -23,8 +23,8 @@ func TestMyintervals_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("MYINTERVALS")
-	inactiveSecret := testSecrets.MustGetField("MYINTERVALS_INACTIVE")
+	secret := testSecrets.MustGetField(t, "MYINTERVALS")
+	inactiveSecret := testSecrets.MustGetField(t, "MYINTERVALS_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

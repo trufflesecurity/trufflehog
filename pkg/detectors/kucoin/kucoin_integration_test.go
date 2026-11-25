@@ -23,12 +23,12 @@ func TestKuCoin_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("KUCOIN")
-	inactiveSecret := testSecrets.MustGetField("KUCOIN_INACTIVE")
-	key := testSecrets.MustGetField("KUCOIN_KEY")
-	inactiveKey := testSecrets.MustGetField("KUCOIN_KEY_INACTIVE")
-	passphrase := testSecrets.MustGetField("KUCOIN_PASSPHRASE")
-	inactivePassphrase := testSecrets.MustGetField("KUCOIN_PASSPHRASE_INACTIVE")
+	secret := testSecrets.MustGetField(t, "KUCOIN")
+	inactiveSecret := testSecrets.MustGetField(t, "KUCOIN_INACTIVE")
+	key := testSecrets.MustGetField(t, "KUCOIN_KEY")
+	inactiveKey := testSecrets.MustGetField(t, "KUCOIN_KEY_INACTIVE")
+	passphrase := testSecrets.MustGetField(t, "KUCOIN_PASSPHRASE")
+	inactivePassphrase := testSecrets.MustGetField(t, "KUCOIN_PASSPHRASE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

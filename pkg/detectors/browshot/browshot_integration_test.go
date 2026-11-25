@@ -23,8 +23,8 @@ func TestBrowshot_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("BROWSHOT")
-	inactiveSecret := testSecrets.MustGetField("BROWSHOT_INACTIVE")
+	secret := testSecrets.MustGetField(t, "BROWSHOT")
+	inactiveSecret := testSecrets.MustGetField(t, "BROWSHOT_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

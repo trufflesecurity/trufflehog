@@ -24,8 +24,8 @@ func TestFlyio_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("FLYIO")
-	inactiveSecret := testSecrets.MustGetField("FLYIO_INACTIVE")
+	secret := testSecrets.MustGetField(t, "FLYIO")
+	inactiveSecret := testSecrets.MustGetField(t, "FLYIO_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

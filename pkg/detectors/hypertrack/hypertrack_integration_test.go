@@ -23,10 +23,10 @@ func TestHypertrack_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("HYPERTRACK")
-	inactiveSecret := testSecrets.MustGetField("HYPERTRACK_INACTIVE")
-	account := testSecrets.MustGetField("HYPERTRACK_ACCOUNT")
-	inactiveAccount := testSecrets.MustGetField("HYPERTRACK_ACCOUNT_INACTIVE")
+	secret := testSecrets.MustGetField(t, "HYPERTRACK")
+	inactiveSecret := testSecrets.MustGetField(t, "HYPERTRACK_INACTIVE")
+	account := testSecrets.MustGetField(t, "HYPERTRACK_ACCOUNT")
+	inactiveAccount := testSecrets.MustGetField(t, "HYPERTRACK_ACCOUNT_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

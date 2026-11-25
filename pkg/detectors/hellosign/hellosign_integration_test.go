@@ -23,8 +23,8 @@ func TestHelloSign_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("HELLOSIGN")
-	inactiveSecret := testSecrets.MustGetField("HELLOSIGN_INACTIVE")
+	secret := testSecrets.MustGetField(t, "HELLOSIGN")
+	inactiveSecret := testSecrets.MustGetField(t, "HELLOSIGN_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

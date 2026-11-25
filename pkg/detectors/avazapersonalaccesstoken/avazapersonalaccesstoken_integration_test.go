@@ -23,8 +23,8 @@ func TestAvazaPersonalAccessToken_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("AVAZAPERSONALACCESSTOKEN")
-	inactiveSecret := testSecrets.MustGetField("AVAZAPERSONALACCESSTOKEN_INACTIVE")
+	secret := testSecrets.MustGetField(t, "AVAZAPERSONALACCESSTOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "AVAZAPERSONALACCESSTOKEN_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

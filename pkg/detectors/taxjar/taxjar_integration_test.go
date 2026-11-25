@@ -23,8 +23,8 @@ func TestTaxjar_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("TAXJAR_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("TAXJAR_INACTIVE")
+	secret := testSecrets.MustGetField(t, "TAXJAR_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "TAXJAR_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

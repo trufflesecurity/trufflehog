@@ -23,8 +23,8 @@ func TestDeepgram_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("DEEPGRAM")
-	inactiveSecret := testSecrets.MustGetField("DEEPGRAM_INACTIVE")
+	secret := testSecrets.MustGetField(t, "DEEPGRAM")
+	inactiveSecret := testSecrets.MustGetField(t, "DEEPGRAM_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

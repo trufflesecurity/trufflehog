@@ -23,9 +23,9 @@ func TestAnalyzer_Analyze(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	secret := testSecrets.MustGetField("PLAIDKEY_SECRET")
-	clientID := testSecrets.MustGetField("PLAIDKEY_CLIENTID")
-	accessToken := testSecrets.MustGetField("PLAIDKEY_ACCESS_TOKEN")
+	secret := testSecrets.MustGetField(t, "PLAIDKEY_SECRET")
+	clientID := testSecrets.MustGetField(t, "PLAIDKEY_CLIENTID")
+	accessToken := testSecrets.MustGetField(t, "PLAIDKEY_ACCESS_TOKEN")
 
 	tests := []struct {
 		name        string

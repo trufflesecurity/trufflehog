@@ -23,8 +23,8 @@ func TestSslMate_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("SSLMATE_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("SSLMATE_INACTIVE")
+	secret := testSecrets.MustGetField(t, "SSLMATE_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "SSLMATE_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

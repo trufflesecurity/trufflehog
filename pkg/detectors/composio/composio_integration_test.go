@@ -34,8 +34,8 @@ func TestComposio_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("COMPOSIO_PROJECT_KEY")
-	inactiveSecret := testSecrets.MustGetField("COMPOSIO_PROJECT_KEY_INACTIVE")
+	secret := testSecrets.MustGetField(t, "COMPOSIO_PROJECT_KEY")
+	inactiveSecret := testSecrets.MustGetField(t, "COMPOSIO_PROJECT_KEY_INACTIVE")
 
 	unverifiedExtra := map[string]string{
 		"key_type":       "project",

@@ -23,8 +23,8 @@ func TestRapidApi_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("RAPIDAPI_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("RAPIDAPI_INACTIVE")
+	secret := testSecrets.MustGetField(t, "RAPIDAPI_TOKEN")
+	inactiveSecret := testSecrets.MustGetField(t, "RAPIDAPI_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

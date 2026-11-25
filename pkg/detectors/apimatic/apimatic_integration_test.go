@@ -23,9 +23,9 @@ func TestAPIMatic_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("APIMATIC")
-	pass := testSecrets.MustGetField("APIMATIC_PASS")
-	inactiveSecret := testSecrets.MustGetField("APIMATIC_INACTIVE")
+	secret := testSecrets.MustGetField(t, "APIMATIC")
+	pass := testSecrets.MustGetField(t, "APIMATIC_PASS")
+	inactiveSecret := testSecrets.MustGetField(t, "APIMATIC_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

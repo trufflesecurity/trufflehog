@@ -23,8 +23,8 @@ func TestYouNeedABudget_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("YOUNEEDABUDGET")
-	inactiveSecret := testSecrets.MustGetField("YOUNEEDABUDGET_INACTIVE")
+	secret := testSecrets.MustGetField(t, "YOUNEEDABUDGET")
+	inactiveSecret := testSecrets.MustGetField(t, "YOUNEEDABUDGET_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

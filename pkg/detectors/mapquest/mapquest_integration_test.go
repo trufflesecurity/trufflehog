@@ -23,8 +23,8 @@ func TestMapquest_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("MAPQUEST")
-	inactiveSecret := testSecrets.MustGetField("MAPQUEST_INACTIVE")
+	secret := testSecrets.MustGetField(t, "MAPQUEST")
+	inactiveSecret := testSecrets.MustGetField(t, "MAPQUEST_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

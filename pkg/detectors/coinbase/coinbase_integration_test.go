@@ -27,10 +27,10 @@ func TestCoinbase_FromChunk(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	keyName := testSecrets.MustGetField("COINBASE_KEY_NAME")
-	privateKey := testSecrets.MustGetField("COINBASE_PRIVATE_KEY")
-	inactiveKeyName := testSecrets.MustGetField("COINBASE_INACTIVE_KEY_NAME")
-	inactivePrivateKey := testSecrets.MustGetField("COINBASE_INACTIVE_PRIVATE_KEY")
+	keyName := testSecrets.MustGetField(t, "COINBASE_KEY_NAME")
+	privateKey := testSecrets.MustGetField(t, "COINBASE_PRIVATE_KEY")
+	inactiveKeyName := testSecrets.MustGetField(t, "COINBASE_INACTIVE_KEY_NAME")
+	inactivePrivateKey := testSecrets.MustGetField(t, "COINBASE_INACTIVE_PRIVATE_KEY")
 
 	type args struct {
 		ctx    context.Context
@@ -142,7 +142,7 @@ func TestCoinbase_FromChunk(t *testing.T) {
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "primarySecret")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := cmp.Diff(got, tt.want, ignoreOpts, cmpopts.IgnoreUnexported(detectors.Result{})); diff != "" {
 				t.Errorf("Coinbase.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

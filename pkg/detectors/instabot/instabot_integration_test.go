@@ -23,8 +23,8 @@ func TestInstabot_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("INSTABOT")
-	inactiveSecret := testSecrets.MustGetField("INSTABOT_INACTIVE")
+	secret := testSecrets.MustGetField(t, "INSTABOT")
+	inactiveSecret := testSecrets.MustGetField(t, "INSTABOT_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

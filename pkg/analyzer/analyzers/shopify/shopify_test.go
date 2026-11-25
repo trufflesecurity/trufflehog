@@ -23,8 +23,8 @@ func TestAnalyzer_Analyze(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	secret := testSecrets.MustGetField("SHOPIFY_ADMIN_SECRET")
-	domain := testSecrets.MustGetField("SHOPIFY_DOMAIN")
+	secret := testSecrets.MustGetField(t, "SHOPIFY_ADMIN_SECRET")
+	domain := testSecrets.MustGetField(t, "SHOPIFY_DOMAIN")
 
 	tests := []struct {
 		name     string

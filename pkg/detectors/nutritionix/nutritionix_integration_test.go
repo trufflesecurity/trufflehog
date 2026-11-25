@@ -23,9 +23,9 @@ func TestNutritionix_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("NUTRITIONIX")
-	id := testSecrets.MustGetField("NUTRITIONIX_ID")
-	inactiveSecret := testSecrets.MustGetField("NUTRITIONIX_INACTIVE")
+	secret := testSecrets.MustGetField(t, "NUTRITIONIX")
+	id := testSecrets.MustGetField(t, "NUTRITIONIX_ID")
+	inactiveSecret := testSecrets.MustGetField(t, "NUTRITIONIX_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

@@ -23,8 +23,8 @@ func TestTatumIO_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("TATUMIO")
-	inactiveSecret := testSecrets.MustGetField("TATUMIO_INACTIVE")
+	secret := testSecrets.MustGetField(t, "TATUMIO")
+	inactiveSecret := testSecrets.MustGetField(t, "TATUMIO_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
