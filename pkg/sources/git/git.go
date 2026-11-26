@@ -351,7 +351,7 @@ func (s *Source) scanRepo(ctx context.Context, repoURI string, reporter sources.
 		// remove the directory only if it was created as a temporary path, or if it is a clone path and --no-cleanup is not set.
 		// if legacy JSON is enabled, don't remove the directory because we need it for outputting legacy JSON.
 		if !s.conn.GetPrintLegacyJson() {
-			if strings.HasPrefix(path, filepath.Join(os.TempDir(), "trufflehog")) || (!s.conn.GetNoCleanup() && s.conn.GetClonePath() != "") {
+			if isTempClonePath(path) || (!s.conn.GetNoCleanup() && s.conn.GetClonePath() != "") {
 				defer func() { _ = os.RemoveAll(path) }()
 			}
 		}
@@ -604,7 +604,7 @@ func cloneRetryDelay(err error, attempt int) time.Duration {
 // delete each other's directories.
 func createClonePath(gitURL, clonePath string) (string, error) {
 	if clonePath == "" {
-		path, err := cleantemp.MkdirTemp()
+		path, err := cleantemp.MkdirTempOutside(localRepoPath(gitURL))
 		if err != nil {
 			return "", fmt.Errorf("failed to create temporary clone path: %w", err)
 		}
@@ -629,6 +629,33 @@ func createClonePath(gitURL, clonePath string) (string, error) {
 		return "", fmt.Errorf("failed to set permissions on clone path %s: %w", path, err)
 	}
 	return path, nil
+}
+
+// localRepoPath returns the absolute path of a repository referenced by a
+// file:// URL. Only local sources can contain the system temp directory (for
+// example when a bind mount places the repository at /tmp); remote sources
+// return an empty string.
+func localRepoPath(gitURL string) string {
+	u, err := url.Parse(gitURL)
+	if err != nil || u.Scheme != "file" {
+		return ""
+	}
+	p := u.Path
+	if u.Host != "" {
+		p = filepath.Join(u.Host, p)
+	}
+	abs, err := filepath.Abs(p)
+	if err != nil {
+		return ""
+	}
+	return abs
+}
+
+// isTempClonePath reports whether path is a temporary clone directory created
+// by createClonePath. Such directories keep the trufflehog- prefix regardless
+// of which temp base they were created in.
+func isTempClonePath(path string) bool {
+	return strings.HasPrefix(filepath.Base(path), "trufflehog-")
 }
 
 // executeClone prepares the Git URL, constructs, and executes the git clone command using the provided

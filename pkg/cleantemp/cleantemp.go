@@ -1,6 +1,7 @@
 package cleantemp
 
 import (
+	"errors"
 	"fmt"
 	regexp "github.com/wasilibs/go-re2"
 	"io"
@@ -29,6 +30,71 @@ func MkdirTemp() (string, error) {
 		return "", err
 	}
 	return dir, nil
+}
+
+// MkdirTempOutside creates a temporary directory with the standard
+// trufflehog-<pid>-<randint> name in the first candidate base directory that
+// is not inside excluded. This keeps a clone destination out of a local source
+// repository when the system temp dir is bind-mounted over that repository.
+func MkdirTempOutside(excluded string) (string, error) {
+	prefix := fmt.Sprintf(defaultArtifactPrefixFormat, defaultExecPath, os.Getpid())
+	var errs []error
+	for _, base := range tempDirCandidates(excluded) {
+		dir, err := os.MkdirTemp(base, prefix)
+		if err == nil {
+			return dir, nil
+		}
+		errs = append(errs, err)
+	}
+	if len(errs) == 0 {
+		return "", fmt.Errorf("no temporary directory outside %q is available", excluded)
+	}
+	return "", errors.Join(errs...)
+}
+
+// tempDirCandidates returns candidate base directories in preference order,
+// omitting duplicates and any directory that resolves inside excluded.
+func tempDirCandidates(excluded string) []string {
+	seen := make(map[string]bool)
+	var candidates []string
+	add := func(dir string) {
+		if dir == "" || seen[dir] || pathWithin(dir, excluded) {
+			return
+		}
+		seen[dir] = true
+		candidates = append(candidates, dir)
+	}
+	add(os.TempDir())
+	// /var/tmp is a conventional second temp location on Unix and is
+	// typically outside a repository mounted at /tmp. Where it does not
+	// exist or is not writable, the next candidate is used.
+	add("/var/tmp")
+	if home, err := os.UserHomeDir(); err == nil {
+		add(home)
+	}
+	add(filepath.Dir(os.TempDir()))
+	return candidates
+}
+
+// pathWithin reports whether child is equal to or nested under parent. An
+// empty parent matches nothing.
+func pathWithin(child, parent string) bool {
+	if parent == "" {
+		return false
+	}
+	childAbs, err := filepath.Abs(child)
+	if err != nil {
+		return false
+	}
+	parentAbs, err := filepath.Abs(parent)
+	if err != nil {
+		return false
+	}
+	rel, err := filepath.Rel(parentAbs, childAbs)
+	if err != nil {
+		return false
+	}
+	return rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
 
 // Unlike MkdirTemp, we only want to generate the filename string.
