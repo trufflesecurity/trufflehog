@@ -262,3 +262,32 @@ func TestGithubTokenType_EveryKeyPatPrefixResolves(t *testing.T) {
 		})
 	}
 }
+
+func TestGithub_StatelessInstallationToken(t *testing.T) {
+	token := "ghs_4973341_eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.o7D9JwpQrxGydKmihcZ8gMdrjIkww_ahWX4gKAQmAAoFd5w_GY0maKAdpys3P3qEgnmrMo8CUmEbkmC6BY1toJW5rXoIemO9yN1xMz6lmPUapABg426y0QUCpHEpxr2zy1kX2y-5-LCX05_9AXY60OXWK2B78X20un9uQK9D-kJOy3ss6IEDDffOCEuLnPEdmXl3oR7_lbvizhkZXfeAo5FhLZP3aDWoEST_SVRcSBmKNSiA0g2nWLNH04U4v-.D0MBOBTo3H7vSeoMUW40sO-TUIo9QUsbNyga0djPmZvCbJtqzkRBlgrZxa-MGRNSR8S1QFBfCOApklZ7Jp78p0"
+	for _, input := range []string{"token = " + token, "token = " + token + "\n", `"` + token + `"`} {
+		results, err := Scanner{}.FromData(context.Background(), false, []byte(input))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(results) != 1 || string(results[0].Raw) != token {
+			t.Errorf("expected whole token for %q, got %d results", input, len(results))
+		}
+	}
+}
+
+func TestGithub_DictionaryWordTokensNotFalsePositive(t *testing.T) {
+	for _, token := range []string{
+		"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",
+		"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",
+		"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",
+	} {
+		results, err := Scanner{}.FromData(context.Background(), false, []byte("token = "+token))
+		if err != nil || len(results) != 1 {
+			t.Fatalf("expected a match for %s, got %d (%v)", token, len(results), err)
+		}
+		if fp, reason := detectors.GetFalsePositiveCheck(Scanner{})(results[0]); fp {
+			t.Errorf("%s dropped as false positive: %s", token, reason)
+		}
+	}
+}

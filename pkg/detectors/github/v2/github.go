@@ -20,6 +20,7 @@ type Scanner struct {
 // Ensure the Scanner satisfies the interfaces at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.Versioner = (*Scanner)(nil)
+var _ detectors.CustomFalsePositiveChecker = (*Scanner)(nil)
 var _ detectors.EndpointCustomizer = (*Scanner)(nil)
 var _ detectors.CloudProvider = (*Scanner)(nil)
 
@@ -34,7 +35,10 @@ var (
 	// Token type list:
 	// https://github.blog/2021-04-05-behind-githubs-new-authentication-token-formats/
 	// https://github.blog/changelog/2022-10-18-introducing-fine-grained-personal-access-tokens/
-	keyPat = regexp.MustCompile(`\b((?:ghp|gho|ghu|ghs|ghr|github_pat)_[a-zA-Z0-9_]{36,255})\b`)
+	// The first alternative is the stateless installation token (ghs_APPID_JWT), which contains dots
+	// and can end in "-", so it has no trailing \b.
+	// https://github.blog/changelog/2026-10-02-stateless-github-app-installation-tokens-rolled-out/
+	keyPat = regexp.MustCompile(`\b(ghs_[0-9]+_eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+|(?:ghp|gho|ghu|ghs|ghr|github_pat)_[a-zA-Z0-9_]{36,255}\b)`)
 
 	// TODO: Oauth2 client_id and client_secret
 	// https://developer.github.com/v3/#oauth2-keysecret
@@ -113,6 +117,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	return
+}
+
+// IsFalsePositive skips the English-word check: the known prefixes already rule out prose, and the
+// random body of a real token contains a dictionary word about 1 time in 300.
+func (Scanner) IsFalsePositive(result detectors.Result) (bool, string) {
+	return detectors.IsKnownFalsePositive(string(result.Raw), detectors.DefaultFalsePositives, false)
 }
 
 func (s Scanner) Type() detector_typepb.DetectorType {
