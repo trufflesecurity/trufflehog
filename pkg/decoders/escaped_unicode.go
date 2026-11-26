@@ -191,9 +191,13 @@ func decodeWithPattern(input []byte, re *regexp.Regexp) []byte {
 		return input
 	}
 
-	utf8Bytes := make([]byte, maxBytesPerRune)
-	for i := len(indices) - 1; i >= 0; i-- {
-		m := indices[i]
+	// Write the output over the input in one forward pass. A decoded rune is
+	// never longer than its escape sequence, so the output never overtakes the
+	// input that is not read yet. Replacing each match from the end instead
+	// copies the rest of the input for each match, which is quadratic.
+	out := input[:0]
+	prev := 0
+	for _, m := range indices {
 		start, end := m[0], m[1]
 		hexStart, hexEnd := m[2], m[3]
 
@@ -202,10 +206,11 @@ func decodeWithPattern(input []byte, re *regexp.Regexp) []byte {
 			continue
 		}
 
-		utf8Len := utf8.EncodeRune(utf8Bytes, rune(cp))
-		input = append(input[:start], append(utf8Bytes[:utf8Len], input[end:]...)...)
+		out = append(out, input[prev:start]...)
+		out = utf8.AppendRune(out, rune(cp))
+		prev = end
 	}
-	return input
+	return append(out, input[prev:]...)
 }
 
 func decodeCodePoint(input []byte) []byte {
@@ -217,10 +222,15 @@ func decodeCodePoint(input []byte) []byte {
 // has. FromChunk needs the match list to decide whether this pattern applies,
 // so it passes that list straight through rather than scanning a second time.
 func decodeCodePointAt(input []byte, indices [][]int) []byte {
-	// Iterate over found indices in reverse order to avoid modifying the slice length
-	utf8Bytes := make([]byte, maxBytesPerRune)
-	for i := len(indices) - 1; i >= 0; i-- {
-		matches := indices[i]
+	if len(indices) == 0 {
+		return input
+	}
+
+	// Write the output over the input in one forward pass, as in
+	// decodeWithPattern.
+	out := input[:0]
+	prev := 0
+	for _, matches := range indices {
 
 		startIndex := matches[0]
 		endIndex := matches[1]
@@ -243,14 +253,13 @@ func decodeCodePointAt(input []byte, indices [][]int) []byte {
 			continue
 		}
 
-		// Convert the Unicode code point to a UTF-8 representation
-		utf8Len := utf8.EncodeRune(utf8Bytes, rune(unicodeInt))
-
 		// Replace the escape sequence with the UTF-8 representation
-		input = append(input[:startIndex], append(utf8Bytes[:utf8Len], input[endIndex:]...)...)
+		out = append(out, input[prev:startIndex]...)
+		out = utf8.AppendRune(out, rune(unicodeInt))
+		prev = endIndex
 	}
 
-	return input
+	return append(out, input[prev:]...)
 }
 
 func decodeEscaped(input []byte) []byte {
