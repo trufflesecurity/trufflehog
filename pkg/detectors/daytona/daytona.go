@@ -62,8 +62,28 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return
 }
 
+// verifyEndpoints lists the Daytona API hosts a key may be valid against: the
+// original (v0) API and the newer (v2) API. A key is invalid only if every host rejects it.
+var verifyEndpoints = []string{
+	"https://app.daytona.io/api/sandbox",
+	"https://api.daytona.com/sandboxes",
+}
+
 func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://app.daytona.io/api/sandbox", nil)
+	for _, endpoint := range verifyEndpoints {
+		verified, err := verifyEndpoint(ctx, client, endpoint, token)
+		if err != nil {
+			return false, err
+		}
+		if verified {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func verifyEndpoint(ctx context.Context, client *http.Client, endpoint, token string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return false, err
 	}
