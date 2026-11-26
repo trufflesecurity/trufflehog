@@ -225,6 +225,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/datadogapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/datadogtoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/datagov"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/daytona"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/deepai"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/deepgram"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/deepseek"
@@ -1140,6 +1141,7 @@ func buildDetectorList() []detectors.Detector {
 		&dareboost.Scanner{},
 		&databox.Scanner{},
 		&databrickstoken.Scanner{},
+		&daytona.Scanner{},
 		&datadogapikey.Scanner{},
 		&datadogtoken.Scanner{},
 		&datagov.Scanner{},
