@@ -203,6 +203,26 @@ func TestCreateClonePath(t *testing.T) {
 		assert.NotEqual(t, first, second)
 	})
 
+	t.Run("local source inside temp dir gets an external clone path", func(t *testing.T) {
+		// The Docker action bind-mounts the checked-out repository over the
+		// container's default temp dir (/tmp). Cloning into a directory nested
+		// inside that source fails on some filesystems and silently produces
+		// an empty scan (issue #5400).
+		source := t.TempDir()
+		t.Setenv("TMPDIR", source)
+
+		path, err := createClonePath("file://"+source, "")
+		assert.NoError(t, err)
+		defer func() { _ = os.RemoveAll(path) }()
+
+		rel, err := filepath.Rel(source, path)
+		assert.NoError(t, err)
+		assert.True(t, rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)),
+			"clone path %q must be outside source %q", path, source)
+		assert.True(t, strings.HasPrefix(filepath.Base(path), "trufflehog-"),
+			"temp clone path %q lost its trufflehog- cleanup prefix", path)
+	})
+
 	t.Run("clonePath set builds trufflehog-<repo>-<random> subdirectory", func(t *testing.T) {
 		base := t.TempDir()
 		path, err := createClonePath("https://github.com/org/repo.git", base)
