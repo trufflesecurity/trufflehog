@@ -2,6 +2,7 @@ package firehydrant
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -118,7 +119,7 @@ func TestFireHydrant_Verify(t *testing.T) {
 			status:       200,
 			body:         `{"actor":{"name":"ci-bot","type":"bot"},"organization":{"name":"Example"}}`,
 			wantVerified: true,
-			wantExtra:    map[string]string{"actor_name": "ci-bot", "actor_type": "bot", "organization": "Example"},
+			wantExtra:    map[string]string{"actor_name": "ci-bot", "actor_type": "bot", "organization": "Example", "region": "us"},
 		},
 		{
 			name:   "401 determinately unverified",
@@ -158,9 +159,9 @@ func TestFireHydrant_VerifyEdgeCases(t *testing.T) {
 		body      string
 		wantExtra map[string]string
 	}{
-		{name: "malformed 200 body is still verified", body: `not json`, wantExtra: nil},
-		{name: "empty 200 body is still verified", body: ``, wantExtra: nil},
-		{name: "partial 200 body", body: `{"actor":{"name":"ci-bot"}}`, wantExtra: map[string]string{"actor_name": "ci-bot"}},
+		{name: "malformed 200 body is still verified", body: `not json`, wantExtra: map[string]string{"region": "us"}},
+		{name: "empty 200 body is still verified", body: ``, wantExtra: map[string]string{"region": "us"}},
+		{name: "partial 200 body", body: `{"actor":{"name":"ci-bot"}}`, wantExtra: map[string]string{"actor_name": "ci-bot", "region": "us"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -194,4 +195,107 @@ func TestFireHydrant_Request(t *testing.T) {
 	require.Len(t, results, 1)
 	require.Equal(t, 1, calls)
 	require.Equal(t, map[string]string{"key": key}, results[0].SecretParts)
+}
+
+// TestFireHydrant_Regions checks that region-scoped keys are verified against both the US and EU
+// hosts, and that a key is only determinately invalid when every region rejects it.
+func TestFireHydrant_Regions(t *testing.T) {
+	key := "fhb-0a1b2c3d4e5f60718293a4b5c6d7e8f9"
+	const us, eu = "api.firehydrant.io", "api.eu.firehydrant.io"
+	type reply struct {
+		status int
+		err    bool
+	}
+	tests := []struct {
+		name         string
+		replies      map[string]reply
+		wantVerified bool
+		wantErr      bool
+		wantRegion   string
+		wantHosts    []string
+	}{
+		{
+			name:         "US key: verified on the first call, EU not tried",
+			replies:      map[string]reply{us: {status: 200}},
+			wantVerified: true, wantRegion: "us", wantHosts: []string{us},
+		},
+		{
+			name:         "EU key: US 401, EU 200 is verified",
+			replies:      map[string]reply{us: {status: 401}, eu: {status: 200}},
+			wantVerified: true, wantRegion: "eu", wantHosts: []string{us, eu},
+		},
+		{
+			name:      "both regions 401 is determinately invalid",
+			replies:   map[string]reply{us: {status: 401}, eu: {status: 401}},
+			wantHosts: []string{us, eu},
+		},
+		{
+			name:      "US 401, EU 500 is indeterminate",
+			replies:   map[string]reply{us: {status: 401}, eu: {status: 500}},
+			wantErr:   true,
+			wantHosts: []string{us, eu},
+		},
+		{
+			name:      "US network error, EU 401 is indeterminate",
+			replies:   map[string]reply{us: {err: true}, eu: {status: 401}},
+			wantErr:   true,
+			wantHosts: []string{us, eu},
+		},
+		{
+			name:         "US network error, EU 200 is verified",
+			replies:      map[string]reply{us: {err: true}, eu: {status: 200}},
+			wantVerified: true, wantRegion: "eu", wantHosts: []string{us, eu},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var hosts []string
+			client := &http.Client{Transport: common.FakeTransport{
+				CreateResponse: func(req *http.Request) (*http.Response, error) {
+					hosts = append(hosts, req.URL.Host)
+					require.Equal(t, "/v1/ping", req.URL.Path)
+					require.Equal(t, "Bearer "+key, req.Header.Get("Authorization"))
+					r, ok := tt.replies[req.URL.Host]
+					require.True(t, ok, "unexpected host %s", req.URL.Host)
+					if r.err {
+						return nil, errors.New("connection reset")
+					}
+					return &http.Response{Request: req, StatusCode: r.status, Body: io.NopCloser(strings.NewReader(`{}`))}, nil
+				},
+			}}
+			s := Scanner{client: client}
+			results, err := s.FromData(context.Background(), true, []byte(key))
+			require.NoError(t, err)
+			require.Len(t, results, 1)
+			require.Equal(t, tt.wantVerified, results[0].Verified)
+			require.Equal(t, tt.wantErr, results[0].VerificationError() != nil)
+			require.Equal(t, tt.wantHosts, hosts)
+			if tt.wantVerified {
+				require.Equal(t, tt.wantRegion, results[0].ExtraData["region"])
+			}
+		})
+	}
+}
+
+// From Stephen's review suggestion: an EU token (401 on US, 200 on EU) is verified, and the EU
+// response's ExtraData is kept.
+func TestFireHydrant_Verify_MultiRegion(t *testing.T) {
+	key := "fhb-0a1b2c3d4e5f60718293a4b5c6d7e8f9"
+	client := &http.Client{Transport: common.FakeTransport{
+		CreateResponse: func(req *http.Request) (*http.Response, error) {
+			if strings.Contains(req.URL.Host, "api.eu.") {
+				return &http.Response{Request: req, StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{"organization":{"name":"EU Org"}}`))}, nil
+			}
+			return &http.Response{Request: req, StatusCode: http.StatusUnauthorized,
+				Body: io.NopCloser(strings.NewReader(`{"error":"The bearer token you provided is invalid or expired."}`))}, nil
+		},
+	}}
+	s := Scanner{client: client}
+	results, err := s.FromData(context.Background(), true, []byte(key))
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	require.True(t, results[0].Verified, "EU token should be verified even if US endpoint returns 401")
+	require.NoError(t, results[0].VerificationError())
+	require.Equal(t, map[string]string{"organization": "EU Org", "region": "eu"}, results[0].ExtraData)
 }

@@ -29,8 +29,20 @@ var (
 	keyPat = regexp.MustCompile(`\b(fhb-[a-f0-9]{32})\b`)
 
 	// Authenticated, read-only connectivity check: https://docs.firehydrant.com/reference/ping
-	verifyURL = "https://api.firehydrant.io/v1/ping"
+	// Keys are region-scoped. EU accounts (eu.firehydrant.io) use api.eu.firehydrant.io instead of
+	// api.firehydrant.io (https://docs.firehydrant.com/docs/change-events), so a live EU key gets a
+	// 401 from the US host. Both known hosts are tried; nothing taken from scanned data is ever used
+	// as a verification URL.
+	verifyEndpoints = []verifyEndpoint{
+		{region: "us", url: "https://api.firehydrant.io/v1/ping"},
+		{region: "eu", url: "https://api.eu.firehydrant.io/v1/ping"},
+	}
 )
+
+type verifyEndpoint struct {
+	region string
+	url    string
+}
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
@@ -83,10 +95,31 @@ type pongResponse struct {
 	} `json:"organization"`
 }
 
-// verifyMatch calls the authenticated, read-only ping endpoint, which returns the actor
-// and organization the token belongs to.
+// verifyMatch tries each regional ping endpoint in turn. The key is verified if any region accepts
+// it, and determinately invalid only if every region rejects it with 401. Any other outcome in a
+// region where the key wasn't accepted (403, 5xx, network error) leaves the result indeterminate.
 func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, map[string]string, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, verifyURL, http.NoBody)
+	var lastErr error
+	for _, ep := range verifyEndpoints {
+		verified, extraData, err := verifyRegion(ctx, client, ep.url, token)
+		if verified {
+			if extraData == nil {
+				extraData = map[string]string{}
+			}
+			extraData["region"] = ep.region
+			return true, extraData, nil
+		}
+		if err != nil {
+			lastErr = fmt.Errorf("%s: %w", ep.region, err)
+		}
+	}
+	return false, nil, lastErr
+}
+
+// verifyRegion calls one region's authenticated, read-only ping endpoint, which returns the actor
+// and organization the token belongs to.
+func verifyRegion(ctx context.Context, client *http.Client, url, token string) (bool, map[string]string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return false, nil, err
 	}
@@ -121,12 +154,9 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 		if pong.Organization != nil && pong.Organization.Name != "" {
 			extraData["organization"] = pong.Organization.Name
 		}
-		if len(extraData) == 0 {
-			extraData = nil
-		}
 		return true, extraData, nil
 	case http.StatusUnauthorized:
-		// Invalid or expired key: {"error":"The bearer token you provided is invalid or expired."}
+		// Not valid in this region: {"error":"The bearer token you provided is invalid or expired."}
 		// 403 is left indeterminate, since a valid key with limited permissions could receive it.
 		return false, nil, nil
 	default:
