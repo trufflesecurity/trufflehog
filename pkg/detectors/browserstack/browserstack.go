@@ -24,7 +24,8 @@ type Scanner struct {
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
-const browserStackAPIURL = "https://www.browserstack.com/automate/plan.json"
+// browserStackAPIURL is a var (not a const) so tests can point it at a local test server.
+var browserStackAPIURL = "https://api.browserstack.com/automate/plan.json"
 
 var (
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
@@ -109,7 +110,13 @@ func verifyBrowserStackCredentials(ctx context.Context, client *http.Client, use
 	defer func() { _ = res.Body.Close() }()
 
 	if res.StatusCode == http.StatusOK {
-		return true, nil
+		// A 200 alone is not proof of valid credentials: an interstitial or
+		// bot-challenge page can also return 200 with an HTML body. Only a
+		// JSON response from the API counts as verified.
+		if strings.Contains(res.Header.Get("Content-Type"), "application/json") {
+			return true, nil
+		}
+		return false, nil
 	} else if res.StatusCode == http.StatusForbidden {
 		// Sometimes browserstack (via Cloudflare) will block requests for security
 		body, err := io.ReadAll(res.Body)
