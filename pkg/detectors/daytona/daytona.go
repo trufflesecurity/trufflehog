@@ -70,16 +70,18 @@ var verifyEndpoints = []string{
 }
 
 func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, error) {
+	var firstErr error
 	for _, endpoint := range verifyEndpoints {
 		verified, err := verifyEndpoint(ctx, client, endpoint, token)
-		if err != nil {
-			return false, err
-		}
 		if verified {
 			return true, nil
 		}
+		if err != nil && firstErr == nil {
+			firstErr = err
+		}
 	}
-	return false, nil
+	// An error on any host leaves the result indeterminate rather than "not verified".
+	return false, firstErr
 }
 
 func verifyEndpoint(ctx context.Context, client *http.Client, endpoint, token string) (bool, error) {
