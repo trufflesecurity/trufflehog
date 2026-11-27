@@ -1,43 +1,30 @@
 package git
 
 import (
-	"strings"
-
-	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/textinputs"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/form"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/sources"
 )
 
-type gitCmdModel struct {
-	textinputs.Model
-}
+func init() { sources.Register(Definition()) }
 
-func GetFields() gitCmdModel {
-	uri := textinputs.InputConfig{
-		Label:       "Git URI",
-		Key:         "uri",
-		Help:        "file:// for local git repos",
-		Required:    true,
-		Placeholder: "git@github.com:trufflesecurity/trufflehog.git",
+// Definition returns the git source configuration.
+func Definition() sources.Definition {
+	return sources.Definition{
+		ID:          "git",
+		Title:       "Git",
+		Description: "Scan git repositories.",
+		Tier:        sources.TierOSS,
+		Command:     "git",
+		Fields: []form.FieldSpec{
+			{
+				Key:         "uri",
+				Label:       "Git URI",
+				Help:        "file:// for local git repos",
+				Kind:        form.KindText,
+				Placeholder: "git@github.com:trufflesecurity/trufflehog.git",
+				Emit:        form.EmitPositional,
+				Validators:  []form.Validate{form.Required()},
+			},
+		},
 	}
-
-	return gitCmdModel{textinputs.New([]textinputs.InputConfig{uri})}
-}
-
-func (m gitCmdModel) Cmd() string {
-	var command []string
-	command = append(command, "trufflehog", "git")
-
-	inputs := m.GetInputs()
-
-	command = append(command, inputs["uri"].Value)
-
-	return strings.Join(command, " ")
-}
-
-func (m gitCmdModel) Summary() string {
-	inputs := m.GetInputs()
-	labels := m.GetLabels()
-
-	keys := []string{"uri"}
-	return common.SummarizeSource(keys, inputs, labels)
 }
