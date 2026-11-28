@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"strconv"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -879,6 +880,95 @@ func getGitDir(path string) string {
 	}
 }
 
+// ScanTags scans the messages and taggers of annotated tags. git log visits
+// only commits, so a secret written into an annotated tag message (for
+// example release notes pasted into `git tag -a -m`) never reaches the
+// scanner unless tag objects are read separately. Lightweight tags point
+// straight at a commit and carry no message, so they are skipped.
+func (s *Git) ScanTags(ctx context.Context, repo *git.Repository, path string, reporter sources.ChunkReporter) error {
+	remoteURL := GetSafeRemoteURL(repo, "origin")
+
+	out, err := exec.Command("git", "-C", path, "for-each-ref", "refs/tags", "--format=%(objecttype) %(refname:strip=2) %(objectname)").Output()
+	if err != nil {
+		return err
+	}
+
+	for _, line := range strings.Split(string(out), "\n") {
+		fields := strings.SplitN(line, " ", 3)
+		if len(fields) != 3 || fields[0] != "tag" {
+			continue
+		}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if err := s.scanTag(ctx, path, remoteURL, fields[1], fields[2], reporter); err != nil {
+			ctx.Logger().Error(err, "error scanning tag message", "tag", fields[1])
+		}
+	}
+	return nil
+}
+
+// scanTag reads one annotated tag object and chunks its message and tagger.
+// The chunk metadata names the tag in place of a commit hash so a tag finding
+// can be told apart from a commit finding.
+func (s *Git) scanTag(ctx context.Context, path string, remoteURL string, tagName string, objectName string, reporter sources.ChunkReporter) error {
+	out, err := exec.Command("git", "-C", path, "cat-file", "tag", objectName).Output()
+	if err != nil {
+		return err
+	}
+
+	var tagger, email, when string
+	message := string(out)
+	if idx := strings.Index(message, "\n\n"); idx >= 0 {
+		headers, body := message[:idx], message[idx+2:]
+		message = body
+		for _, header := range strings.Split(headers, "\n") {
+			rest, ok := strings.CutPrefix(header, "tagger ")
+			if !ok {
+				continue
+			}
+			// tagger NAME <EMAIL> UNIXTIME TIMEZONE
+			start := strings.Index(rest, "<")
+			end := strings.Index(rest, ">")
+			if start < 0 || end < 0 || end < start {
+				break
+			}
+			tagger = strings.TrimSpace(rest[:start])
+			email = rest[start+1 : end]
+			parts := strings.Fields(strings.TrimSpace(rest[end+1:]))
+			if len(parts) > 0 {
+				if unix, err := strconv.ParseInt(parts[0], 10, 64); err == nil {
+					when = time.Unix(unix, 0).UTC().Format("2006-01-02 15:04:05 -0700")
+				}
+			}
+		}
+	}
+
+	metadata := s.sourceMetadataFunc(SourceMetadataInfo{
+		Email:               email,
+		Commit:              fmt.Sprintf("tag %s (%s)", tagName, objectName),
+		Timestamp:           when,
+		Repository:          remoteURL,
+		RepositoryLocalPath: path,
+	})
+	var sb strings.Builder
+	sb.WriteString(email)
+	sb.WriteString("\n")
+	sb.WriteString(tagger)
+	sb.WriteString("\n")
+	sb.WriteString(message)
+	chunk := sources.Chunk{
+		SourceName:     s.sourceName,
+		SourceID:       s.sourceID,
+		JobID:          s.jobID,
+		SourceType:     s.sourceType,
+		SourceMetadata: metadata,
+		Data:           []byte(sb.String()),
+		SourceVerify:   s.verify,
+	}
+	return reporter.ChunkOk(ctx, chunk)
+}
+
 func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string, scanOptions *ScanOptions, reporter sources.ChunkReporter) error {
 	// Get the remote URL for reporting (may be empty)
 	remoteURL := GetSafeRemoteURL(repo, "origin")
@@ -1385,6 +1475,11 @@ func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, repoPath strin
 		// Record that we've failed to scan this repo
 		s.metrics.RecordRepoScanned(statusFailure)
 		return err
+	}
+	// Annotated tag messages never show up in the git log output, so scan them
+	// separately; a failure here should not lose the commit findings.
+	if err := s.ScanTags(ctx, repo, repoPath, reporter); err != nil {
+		ctx.Logger().Error(err, "error scanning annotated tag messages")
 	}
 	// Skip staged scanning for mirror/bare clones
 	if !isRepoBare(repoPath) {
