@@ -1,12 +1,14 @@
 package twilioapikey
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"maps"
 	"net/http"
+	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 
@@ -17,11 +19,18 @@ import (
 
 type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
+	detectors.EndpointSetter
 	client *http.Client
 }
 
 // Ensure the Scanner satisfies the interface at compile time.
-var _ detectors.Detector = (*Scanner)(nil)
+var (
+	_ detectors.Detector           = (*Scanner)(nil)
+	_ detectors.EndpointCustomizer = (*Scanner)(nil)
+	_ detectors.CloudProvider      = (*Scanner)(nil)
+)
+
+func (Scanner) CloudEndpoint() string { return "https://verify.twilio.com/v2/Services" }
 
 var (
 	defaultClient = detectors.NewClientWithDedup(common.SaneHttpClient())
@@ -29,20 +38,8 @@ var (
 	secretPat     = regexp.MustCompile(`\b[0-9a-zA-Z]{32}\b`)
 )
 
-type serviceResponse struct {
-	Services []struct {
-		FriendlyName string `json:"friendly_name"` // friendly name of a service
-		SID          string `json:"sid"`           // object id of service
-		AccountSID   string `json:"account_sid"`   // account sid
-	} `json:"services"`
-}
-
 func (s Scanner) getClient() *http.Client {
-	if s.client != nil {
-		return s.client
-	}
-
-	return defaultClient
+	return s.VerificationClient(cmp.Or(s.client, defaultClient))
 }
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -60,27 +57,41 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		uniqueAPIKeys[k] = struct{}{}
 	}
 	uniqueSecrets := make(map[string]struct{})
-	for _, s := range secretPat.FindAllString(dataStr, -1) {
-		uniqueSecrets[s] = struct{}{}
+	for _, sec := range secretPat.FindAllString(dataStr, -1) {
+		uniqueSecrets[sec] = struct{}{}
 	}
 
 	for apiKey := range uniqueAPIKeys {
 		for secret := range uniqueSecrets {
 			s1 := detectors.Result{
-				DetectorType: detector_typepb.DetectorType_Twilio,
+				DetectorType: s.Type(),
 				Raw:          []byte(apiKey),
 				RawV2:        []byte(apiKey + secret),
 				Redacted:     secret[:5] + "...",
 				ExtraData:    make(map[string]string),
-				SecretParts:  map[string]string{"key": apiKey, "sid": secret},
+				SecretParts:  map[string]string{"key": apiKey, "secret": secret},
 			}
 
 			if verify {
-				extraData, isVerified, verificationErr := verifyTwilioAPIKey(ctx, s.getClient(), apiKey, secret)
-				s1.Verified = isVerified
-				s1.SetVerificationError(verificationErr)
-
-				maps.Copy(s1.ExtraData, extraData)
+				var lastErr error
+				for _, endpointURL := range s.Endpoints() {
+					extraData, isVerified, verificationErr := verifyTwilioAPIKey(ctx, s.getClient(), apiKey, secret, endpointURL)
+					s1.Verified = isVerified
+					if verificationErr != nil {
+						lastErr = verificationErr
+					}
+					maps.Copy(s1.ExtraData, extraData)
+					if isVerified {
+						lastErr = nil
+						break
+					}
+					if strings.EqualFold(extraData["status"], "closed") {
+						s1.Verified = false
+						lastErr = nil
+						break
+					}
+				}
+				s1.SetVerificationError(lastErr, secret)
 			}
 
 			results = append(results, s1)
@@ -98,17 +109,16 @@ func (s Scanner) Description() string {
 	return "Twilio is a cloud communications platform that allows software developers to programmatically make and receive phone calls, send and receive text messages, and perform other communication functions using its web service APIs."
 }
 
-func verifyTwilioAPIKey(ctx context.Context, client *http.Client, apiKey, secret string) (map[string]string, bool, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", "https://verify.twilio.com/v2/Services", nil)
+func verifyTwilioAPIKey(ctx context.Context, client *http.Client, apiKey, secret, endpointURL string) (map[string]string, bool, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpointURL, nil)
 	if err != nil {
 		return nil, false, err
 	}
 
-	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Add("Accept", "*/*")
+	req.Header.Add("Accept", "application/json")
 	req.SetBasicAuth(apiKey, secret)
 
-	resp, err := detectors.DoWithDedup(client, detector_typepb.DetectorType_TwilioApiKey, apiKey+secret, req)
+	resp, err := detectors.DoWithDedup(client, detector_typepb.DetectorType_TwilioApiKey, apiKey+secret+endpointURL, req)
 	if err != nil {
 		return nil, false, err
 	}
@@ -120,12 +130,96 @@ func verifyTwilioAPIKey(ctx context.Context, client *http.Client, apiKey, secret
 	switch resp.StatusCode {
 	case http.StatusOK:
 		extraData := make(map[string]string)
-		var serviceResponse serviceResponse
+		bodyBytes, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+		if err != nil {
+			return nil, false, err
+		}
 
-		if err := json.NewDecoder(resp.Body).Decode(&serviceResponse); err == nil && len(serviceResponse.Services) > 0 { // no error in parsing and have at least one service
-			service := serviceResponse.Services[0]
-			extraData["friendly_name"] = service.FriendlyName
-			extraData["account_sid"] = service.AccountSID
+		var hasTwilioPayload bool
+
+		// Try decoding as Verify API /v2/Services response
+		var serviceResponse struct {
+			Services *[]struct {
+				FriendlyName string `json:"friendly_name"`
+				SID          string `json:"sid"`
+				AccountSID   string `json:"account_sid"`
+			} `json:"services"`
+		}
+		if err := json.Unmarshal(bodyBytes, &serviceResponse); err == nil && serviceResponse.Services != nil {
+			hasTwilioPayload = true
+			if len(*serviceResponse.Services) > 0 {
+				service := (*serviceResponse.Services)[0]
+				if service.FriendlyName != "" {
+					extraData["friendly_name"] = service.FriendlyName
+				}
+				if service.AccountSID != "" {
+					extraData["account_sid"] = service.AccountSID
+				}
+			}
+		}
+
+		// Try decoding as Core REST API Accounts list response (e.g. Accounts.json)
+		if !hasTwilioPayload {
+			var accountsList struct {
+				Accounts *[]struct {
+					SID          string `json:"sid"`
+					FriendlyName string `json:"friendly_name"`
+					Status       string `json:"status"`
+					Type         string `json:"type"`
+				} `json:"accounts"`
+			}
+			if err := json.Unmarshal(bodyBytes, &accountsList); err == nil && accountsList.Accounts != nil {
+				hasTwilioPayload = true
+				if len(*accountsList.Accounts) > 0 {
+					acc := (*accountsList.Accounts)[0]
+					if acc.SID != "" {
+						extraData["account_sid"] = acc.SID
+					}
+					if acc.FriendlyName != "" {
+						extraData["friendly_name"] = acc.FriendlyName
+					}
+					if acc.Status != "" {
+						extraData["status"] = acc.Status
+					}
+					if acc.Type != "" {
+						extraData["type"] = acc.Type
+					}
+				}
+			}
+		}
+
+		// Try decoding as single account response
+		if !hasTwilioPayload {
+			var singleAcc struct {
+				SID          string `json:"sid"`
+				FriendlyName string `json:"friendly_name"`
+				Status       string `json:"status"`
+				Type         string `json:"type"`
+			}
+			if err := json.Unmarshal(bodyBytes, &singleAcc); err == nil && strings.HasPrefix(singleAcc.SID, "AC") {
+				hasTwilioPayload = true
+				extraData["account_sid"] = singleAcc.SID
+				if singleAcc.FriendlyName != "" {
+					extraData["friendly_name"] = singleAcc.FriendlyName
+				}
+				if singleAcc.Status != "" {
+					extraData["status"] = singleAcc.Status
+				}
+				if singleAcc.Type != "" {
+					extraData["type"] = singleAcc.Type
+				}
+			}
+		}
+
+		// Require a confirmed Twilio service or account structure to verify the credential.
+		// This prevents generic 200 OK responses (e.g. health check endpoints or auth proxy portals)
+		// from falsely validating arbitrary candidate credentials.
+		if !hasTwilioPayload {
+			return nil, false, fmt.Errorf("unexpected response payload from verifier endpoint")
+		}
+
+		if strings.EqualFold(extraData["status"], "closed") {
+			return extraData, false, nil
 		}
 
 		return extraData, true, nil
