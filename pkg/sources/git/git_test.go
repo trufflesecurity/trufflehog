@@ -2490,3 +2490,128 @@ func TestRedactPasswords(t *testing.T) {
 		})
 	}
 }
+
+// TestScanTags covers https://github.com/trufflesecurity/trufflehog/issues/5609:
+// annotated tag messages must be scanned, lightweight tags must not produce chunks.
+func TestScanTags(t *testing.T) {
+	ctx := context.Background()
+	repoPath := t.TempDir()
+
+	assert.NoError(t, exec.Command("git", "init", repoPath).Run())
+	assert.NoError(t, exec.Command("git", "-C", repoPath, "config", "user.name", "Test User").Run())
+	assert.NoError(t, exec.Command("git", "-C", repoPath, "config", "user.email", "test@example.com").Run())
+	assert.NoError(t, exec.Command("git", "-C", repoPath, "config", "commit.gpgsign", "false").Run())
+	assert.NoError(t, exec.Command("git", "-C", repoPath, "config", "tag.gpgsign", "false").Run())
+	addTestFileAndCommit(t, repoPath, "README", "hello")
+	// Annotated tag with a marker in its message.
+	assert.NoError(t, exec.Command("git", "-C", repoPath, "tag", "-a", "v1.0.0", "-m", "release notes: internal-marker-12345").Run())
+	// Lightweight tags point at a commit and carry no message.
+	assert.NoError(t, exec.Command("git", "-C", repoPath, "tag", "v0.9.0").Run())
+
+	s := Source{}
+	conn, err := anypb.New(&sourcespb.Git{
+		Directories: []string{repoPath},
+		Credential:  &sourcespb.Git_Unauthenticated{Unauthenticated: &credentialspb.Unauthenticated{}},
+	})
+	assert.NoError(t, err)
+	assert.NoError(t, s.Init(ctx, "test repo", 0, 0, false, conn, 1))
+
+	repo, err := RepoFromPath(repoPath)
+	assert.NoError(t, err)
+
+	chunksCh := make(chan *sources.Chunk, 8)
+	go func() {
+		defer close(chunksCh)
+		if err := s.git.ScanTags(ctx, repo, repoPath, sources.ChanReporter{Ch: chunksCh}); err != nil {
+			t.Errorf("ScanTags failed: %v", err)
+		}
+	}()
+
+	var found []*sources.Chunk
+	for chunk := range chunksCh {
+		found = append(found, chunk)
+	}
+	if !assert.Len(t, found, 1) {
+		return
+	}
+	chunk := found[0]
+	assert.Contains(t, string(chunk.Data), "internal-marker-12345")
+	assert.Contains(t, string(chunk.Data), "test@example.com")
+	// The chunk data names the tag, so a tag finding can be told apart from a
+	// commit finding.
+	assert.Contains(t, string(chunk.Data), "tag: v1.0.0")
+	meta := chunk.SourceMetadata.GetGit()
+	if assert.NotNil(t, meta) {
+		// The metadata commit is the commit the tag points at, so provider
+		// links built from it resolve.
+		assert.Equal(t, gitRevParse(t, repoPath, "v1.0.0^{}"), meta.Commit)
+	}
+}
+
+// TestScanTagsForeignGitEnv pins the review finding that the tag git commands
+// inherited the process environment: a GIT_DIR pointing at another repository
+// must not redirect the tag lookup.
+func TestScanTagsForeignGitEnv(t *testing.T) {
+	ctx := context.Background()
+	repoPath := setupTestRepo(t, "tags-env")
+	assert.NoError(t, exec.Command("git", "-C", repoPath, "config", "tag.gpgsign", "false").Run())
+
+	addTestFileAndCommit(t, repoPath, "README", "hello")
+	assert.NoError(t, exec.Command("git", "-C", repoPath, "tag", "-a", "v1.0.0", "-m", "release notes: env-marker-54321").Run())
+
+	foreign := setupTestRepo(t, "foreign")
+	addTestFileAndCommit(t, foreign, "foreign.txt", "foreign\n")
+	t.Setenv("GIT_DIR", filepath.Join(foreign, ".git"))
+
+	s := Source{}
+	conn, err := anypb.New(&sourcespb.Git{
+		Directories: []string{repoPath},
+		Credential:  &sourcespb.Git_Unauthenticated{Unauthenticated: &credentialspb.Unauthenticated{}},
+	})
+	assert.NoError(t, err)
+	assert.NoError(t, s.Init(ctx, "test repo", 0, 0, false, conn, 1))
+
+	repo, err := RepoFromPath(repoPath)
+	assert.NoError(t, err)
+
+	chunksCh := make(chan *sources.Chunk, 8)
+	go func() {
+		defer close(chunksCh)
+		if err := s.git.ScanTags(ctx, repo, repoPath, sources.ChanReporter{Ch: chunksCh}); err != nil {
+			t.Errorf("ScanTags failed: %v", err)
+		}
+	}()
+
+	var found []*sources.Chunk
+	for chunk := range chunksCh {
+		found = append(found, chunk)
+	}
+	if !assert.Len(t, found, 1) {
+		return
+	}
+	assert.Contains(t, string(found[0].Data), "env-marker-54321")
+}
+
+// TestScanRepoSkipsTagsInRangeScans pins the review finding on
+// https://github.com/trufflesecurity/trufflehog/pull/5610: tags are not part
+// of any commit range, so range-limited scans must not report them.
+func TestScanRepoSkipsTagsInRangeScans(t *testing.T) {
+	ctx := context.Background()
+	repoPath := setupTestRepo(t, "tags-gated")
+	assert.NoError(t, exec.Command("git", "-C", repoPath, "config", "tag.gpgsign", "false").Run())
+
+	addTestFileAndCommit(t, repoPath, "one.txt", "one\n")
+	first := gitRevParse(t, repoPath, "HEAD")
+	assert.NoError(t, exec.Command("git", "-C", repoPath, "tag", "-a", "v1.0.0", "-m", "release notes: gated-marker-99999").Run())
+	addTestFileAndCommit(t, repoPath, "two.txt", "two\n")
+
+	// A full-history scan reports the tag message.
+	_, data, err := scanRepoRange(ctx, t, repoPath, "", "")
+	assert.NoError(t, err)
+	assert.Contains(t, data, "gated-marker-99999")
+
+	// A range scan does not.
+	_, data, err = scanRepoRange(ctx, t, repoPath, first, "")
+	assert.NoError(t, err)
+	assert.NotContains(t, data, "gated-marker-99999")
+}

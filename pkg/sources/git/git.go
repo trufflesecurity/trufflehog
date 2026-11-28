@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -879,6 +880,131 @@ func getGitDir(path string) string {
 	}
 }
 
+// ScanTags scans the messages and taggers of annotated tags. git log visits
+// only commits, so a secret written into an annotated tag message (for
+// example release notes pasted into `git tag -a -m`) never reaches the
+// scanner unless tag objects are read separately. Lightweight tags point
+// straight at a commit and carry no message, so they are skipped.
+func (s *Git) ScanTags(ctx context.Context, repo *git.Repository, path string, reporter sources.ChunkReporter) error {
+	remoteURL := GetSafeRemoteURL(repo, "origin")
+
+	// %(*objectname) peels an annotated tag to the commit it points at; it is
+	// empty for anything else.
+	cmd := exec.CommandContext(ctx, "git", "-C", path, "for-each-ref", "refs/tags", "--format=%(objecttype) %(refname:strip=2) %(objectname) %(*objectname)")
+	// Replace the process environment so a foreign GIT_DIR cannot redirect
+	// this lookup, in sync with gitparse.prepGitArgs.
+	cmd.Env = tagScanEnv(path)
+	out, err := cmd.Output()
+	if err != nil {
+		return err
+	}
+
+	for _, line := range strings.Split(string(out), "\n") {
+		fields := strings.SplitN(line, " ", 4)
+		if len(fields) != 4 || fields[0] != "tag" {
+			continue
+		}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if err := s.scanTag(ctx, path, remoteURL, fields[1], fields[2], fields[3], reporter); err != nil {
+			ctx.Logger().Error(err, "error scanning tag message", "tag", fields[1])
+		}
+	}
+	return nil
+}
+
+// tagScanEnv returns the restricted environment for the tag git commands: only
+// the target repo's git directory, plus the object-store overrides pre-receive
+// hooks need, so a GIT_DIR in trufflehog's own environment cannot redirect the
+// commands to another repository. In sync with gitparse.prepGitArgs.
+func tagScanEnv(path string) []string {
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return nil
+	}
+	if !isRepoBare(path) {
+		return []string{"GIT_DIR=" + filepath.Join(absPath, gitDirName)}
+	}
+	env := []string{"GIT_DIR=" + absPath}
+	for _, key := range []string{"GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES"} {
+		if value := os.Getenv(key); value != "" {
+			env = append(env, key+"="+value)
+		}
+	}
+	return env
+}
+
+// scanTag reads one annotated tag object and chunks its message and tagger.
+// The metadata's commit is the commit the tag points at, so provider links
+// built from it resolve; the chunk data names the tag so a tag finding can be
+// told apart from a commit finding.
+func (s *Git) scanTag(ctx context.Context, path string, remoteURL string, tagName string, objectName string, targetCommit string, reporter sources.ChunkReporter) error {
+	cmd := exec.CommandContext(ctx, "git", "-C", path, "cat-file", "tag", objectName)
+	cmd.Env = tagScanEnv(path)
+	out, err := cmd.Output()
+	if err != nil {
+		return err
+	}
+
+	var tagger, email, when string
+	message := string(out)
+	if idx := strings.Index(message, "\n\n"); idx >= 0 {
+		headers, body := message[:idx], message[idx+2:]
+		message = body
+		for _, header := range strings.Split(headers, "\n") {
+			rest, ok := strings.CutPrefix(header, "tagger ")
+			if !ok {
+				continue
+			}
+			// tagger NAME <EMAIL> UNIXTIME TIMEZONE
+			start := strings.Index(rest, "<")
+			end := strings.Index(rest, ">")
+			if start < 0 || end < 0 || end < start {
+				break
+			}
+			tagger = strings.TrimSpace(rest[:start])
+			email = rest[start+1 : end]
+			parts := strings.Fields(strings.TrimSpace(rest[end+1:]))
+			if len(parts) > 0 {
+				if unix, err := strconv.ParseInt(parts[0], 10, 64); err == nil {
+					when = time.Unix(unix, 0).UTC().Format("2006-01-02 15:04:05 -0700")
+				}
+			}
+		}
+	}
+
+	if targetCommit == "" {
+		targetCommit = objectName
+	}
+	metadata := s.sourceMetadataFunc(SourceMetadataInfo{
+		Email:               email,
+		Commit:              targetCommit,
+		Timestamp:           when,
+		Repository:          remoteURL,
+		RepositoryLocalPath: path,
+	})
+	var sb strings.Builder
+	sb.WriteString("tag: ")
+	sb.WriteString(tagName)
+	sb.WriteString("\n")
+	sb.WriteString(email)
+	sb.WriteString("\n")
+	sb.WriteString(tagger)
+	sb.WriteString("\n")
+	sb.WriteString(message)
+	chunk := sources.Chunk{
+		SourceName:     s.sourceName,
+		SourceID:       s.sourceID,
+		JobID:          s.jobID,
+		SourceType:     s.sourceType,
+		SourceMetadata: metadata,
+		Data:           []byte(sb.String()),
+		SourceVerify:   s.verify,
+	}
+	return reporter.ChunkOk(ctx, chunk)
+}
+
 func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string, scanOptions *ScanOptions, reporter sources.ChunkReporter) error {
 	// Get the remote URL for reporting (may be empty)
 	remoteURL := GetSafeRemoteURL(repo, "origin")
@@ -1385,6 +1511,17 @@ func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, repoPath strin
 		// Record that we've failed to scan this repo
 		s.metrics.RecordRepoScanned(statusFailure)
 		return err
+	}
+	// Annotated tag messages never show up in the git log output, so scan them
+	// separately; a failure here should not lose the commit findings. Tags are
+	// not part of any commit range, so only scan them on full-history scans:
+	// with a base/head range (--since-commit, --branch, pre-commit) or a max
+	// depth, scanning tags would report every tag in history, including tags
+	// unrelated to the scanned commits.
+	if scanOptions.BaseHash == "" && scanOptions.HeadHash == "" && scanOptions.MaxDepth <= 0 {
+		if err := s.ScanTags(ctx, repo, repoPath, reporter); err != nil {
+			ctx.Logger().Error(err, "error scanning annotated tag messages")
+		}
 	}
 	// Skip staged scanning for mirror/bare clones
 	if !isRepoBare(repoPath) {
